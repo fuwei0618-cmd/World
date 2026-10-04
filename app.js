@@ -335,7 +335,7 @@ function noteHTML(n) {
   const media = n.media || [];
   const vis = media.filter(m => m.kind !== "audio");
   return `<div class="rec-note"><div class="row" style="justify-content:space-between"><time>${pad(x.getHours())}:${pad(x.getMinutes())}${typeof n.lat === "number" ? " 📍" : ""}</time>
-    ${isOwner() ? `<div class="row"><button class="btn sm ghost" data-editnote="${n.id}">編輯</button></div>` : ""}</div>
+    ${isOwner() ? `<div class="row">${vis.length ? `<button class="btn sm ghost" data-sharenote="${n.id}">分享</button>` : ""}<button class="btn sm ghost" data-editnote="${n.id}">編輯</button></div>` : ""}</div>
     ${vis.length ? `<div class="media">${vis.map((m, i) => m.kind === "photo"
       ? `<button class="pthumb" data-view="${n.id}:${media.indexOf(m)}"><img src="${blobURL(m.blob)}" alt="照片"></button>`
       : `<button class="vthumb" data-view="${n.id}:${media.indexOf(m)}" aria-label="播放影片"><video src="${blobURL(m.blob)}#t=0.1" muted playsinline preload="metadata"></video></button>`).join("")}</div>` : ""}
@@ -1048,9 +1048,41 @@ function openViewer(key) {
   const [id, idx] = key.split(":"); const n = state.notes.find(x => x.id === id); if (!n) return;
   const m = n.media[Number(idx)]; if (!m) return;
   const u = URL.createObjectURL(m.blob);
-  sheet(`<div class="lightbox">${m.kind === "video" ? `<video src="${u}" controls playsinline autoplay></video>` : `<img src="${u}" alt="照片">`}</div>
-    <button class="btn" data-savefile>存到手機／分享</button>`, () => URL.revokeObjectURL(u))
-    .querySelector("[data-savefile]").addEventListener("click", () => shareFile(m.blob, `world-${id}.${extFor(m.type || m.blob.type)}`));
+  const sc = sheet(`<div class="lightbox">${m.kind === "video" ? `<video src="${u}" controls playsinline autoplay></video>` : `<img src="${u}" alt="照片">`}</div>${sharePanelHTML()}`, () => URL.revokeObjectURL(u));
+  bindSharePanel(sc, n, [m]);
+}
+function captionFor(n) {
+  const t = state.trip, d = t.days.find(x => x.id === n.dayId), it = d && d.items.find(x => x.id === n.itemId);
+  const tags = new Set();
+  (t.cities || []).forEach(c => tags.add(c));
+  if (it) (it.ktags || []).forEach(k => tags.add(k));
+  tags.add(country(t).name + "旅行");
+  const lines = [];
+  if (n.text) lines.push(n.text);
+  if (it || t.title) lines.push(`📍 ${[it && (it.place || it.title), (t.cities || [])[0]].filter(Boolean).join("・")}`);
+  lines.push([...tags].map(x => "#" + x.replace(/[\s・・]/g, "")).join(" "));
+  return lines.join("\n\n");
+}
+function sharePanelHTML() {
+  return `<div class="field"><label for="capt">文案（分享時會自動複製，到 IG 長按貼上）</label><textarea id="capt" style="min-height:110px"></textarea></div>
+    <button class="btn primary wide" data-sh="share">分享到 IG／其他 App</button>
+    <div class="row"><button class="btn" data-sh="ig">開啟 Instagram</button><button class="btn" data-sh="copy">只複製文案</button></div>
+    <p class="hint">分享選單裡選 Instagram 就能發貼文、限動或私訊；選「儲存影像」會存到相簿，之後可以用美圖秀秀等 App 打開修圖。分享選單裡沒看到想要的 App，可以滑到最右邊按「更多」把它加進來。</p>`;
+}
+function bindSharePanel(sc, n, media) {
+  const ta = $("#capt", sc); ta.value = captionFor(n);
+  sc.addEventListener("click", async e => {
+    const b = e.target.closest("[data-sh]"); if (!b) return;
+    if (b.dataset.sh === "copy") return copyText(ta.value, ta);
+    if (b.dataset.sh === "ig") { try { await navigator.clipboard.writeText(ta.value); } catch (er) {} location.href = "instagram://camera"; setTimeout(() => toast("沒反應的話，請確認手機有裝 Instagram"), 1500); return; }
+    if (b.dataset.sh === "share") {
+      try { await navigator.clipboard.writeText(ta.value); toast("文案已複製"); } catch (er) {}
+      const files = media.map((m, i) => new File([m.blob], `world-${n.id}-${i}.${extFor(m.type || m.blob.type)}`, { type: m.type || m.blob.type || "application/octet-stream" }));
+      if (navigator.canShare && navigator.canShare({ files })) { try { await navigator.share({ files }); } catch (er) { if (!er || er.name !== "AbortError") toast("分享失敗，檔案可能太大，試著一次分享一個"); } }
+      else if (files.length === 1) shareFile(files[0], files[0].name);
+      else toast("這個瀏覽器不支援一次分享多個檔案，請從主畫面的 World 開啟");
+    }
+  });
 }
 async function shareFile(blob, name) {
   const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
@@ -1255,6 +1287,7 @@ app.addEventListener("click", async e => {
   const kt = t.closest("[data-ktag]"); if (kt) return openKtag(kt.dataset.ktag);
   const rc = t.closest("[data-rec]"); if (rc) return openCompose({ itemId: rc.dataset.rec });
   const ins = t.closest("[data-insert]"); if (ins) return insertPoint(Number(ins.dataset.insert));
+  const sn = t.closest("[data-sharenote]"); if (sn) { const n = state.notes.find(x => x.id === sn.dataset.sharenote); if (n) { const sc = sheet(`<h2>分享這則紀錄</h2><p class="hint">${(n.media || []).filter(m => m.kind !== "audio").length} 個照片／影片會一起送出。</p>${sharePanelHTML()}`); bindSharePanel(sc, n, (n.media || []).filter(m => m.kind !== "audio")); } return; }
   const en = t.closest("[data-editnote]"); if (en) return openCompose({ note: state.notes.find(n => n.id === en.dataset.editnote) });
   const vw = t.closest("[data-view]"); if (vw) return openViewer(vw.dataset.view);
   const mb = t.closest("[data-member]"); if (mb) return openMemberEditor(Number(mb.dataset.member));
