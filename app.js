@@ -122,6 +122,7 @@ function newTrip({ title, countryCode, cities, start, end }) {
     start, end, highlights: [], team: null, days, packing,
     apps: clone(c.apps), food: { eat: [], buy: [] },
     flights: [], hotels: [], emergency: clone(c.emergency), hospital: "", lostPlan: "",
+    big: { land: "", history: "", people: "" },
     private: { contacts: [], insurance: { co: "", tel: "", policy: "", note: "" }, memo: "" },
     createdAt: Date.now()
   };
@@ -265,6 +266,8 @@ function viewOverview() {
   </section>
   ${isOwner() ? `<div class="row" style="margin-top:12px"><button class="btn sm" data-act="edittrip">${ICON.pen} 編輯旅行資料</button><button class="btn sm primary" data-act="publish">發布給團員</button></div>` : ""}
 
+  ${bigHTML(t)}
+
   <section class="section"><header><h2>行程總覽</h2></header>
     <div class="row">${Object.keys(P.types).map(typeChip).join("")}</div>
     <div class="stack">${t.days.map((d, i) => { const x = md(d.date); const live = d.items.filter(it => !it.journalOnly && it.status !== "cancel");
@@ -295,6 +298,7 @@ function itemHTML(it, opts) {
         ${(it.tips || []).map(x => `<span class="chip">${esc(x)}</span>`).join("")}
         ${it.link ? `<a class="chip" href="${esc(it.link)}" target="_blank" rel="noopener">▶ ${esc(it.linkTitle || "連結")}</a>` : ""}</div>` : ""}
       ${(it.niches || []).length && !opts.record ? `<div class="meta">${it.niches.map(n => { const k = it.id + ":" + n; const on = !!(ls.get("niche", {})[k]); return `<button class="chip" data-niche="${esc(k)}" aria-pressed="${on}" style="${on ? "background:var(--ok);color:#fff" : ""}">${esc(n)}</button>`; }).join("")}</div>` : ""}
+      ${!opts.record && !it.journalOnly && (guideCount(it) || isOwner()) ? guideBtn(it) : ""}
       ${repl ? `<div class="replaced">改成 → ${esc(repl.time)} ${esc(repl.title)}</div>` : ""}
       ${opts.record ? `${notes.map(noteHTML).join("")}<div class="row" style="margin-top:8px"><button class="btn sm" data-rec="${it.id}">＋ 記錄</button></div>` : ""}
     </div></div>`;
@@ -569,7 +573,8 @@ const ITEM_FIELDS = [
   { k: "desc", l: "說明", type: "textarea" },
   { k: "tips", l: "小標籤（一行一個）", type: "lines", ph: "拍照機位\n要預約" },
   { k: "link", l: "連結網址", ph: "https://…", half: true }, { k: "linkTitle", l: "連結名稱", ph: "紀錄片", half: true },
-  { k: "niches", l: "重點編號（龕號／展品號，一行一個）", type: "lines" }
+  { k: "niches", l: "重點編號（龕號／展品號，一行一個）", type: "lines" },
+  { k: "ktags", l: "知識標籤（一行一個，會跨旅行串連）", type: "lines", ph: "喀斯特地形\n河港城市" }
 ];
 function openItemEditor(it, onCreate) {
   const d = state.trip.days[state.day];
@@ -672,6 +677,109 @@ function openMemberEditor(i) {
   formSheet({ title: isNew ? "新增團員" : "編輯團員", fields: [{ k: "name", l: "名字" }, { k: "role", l: "職稱", ph: "副隊長" }, { k: "duty", l: "負責", ph: "掌控集合時間" }], value: isNew ? {} : t.team.members[i],
     async onSave(v) { if (!v.name) return false; if (isNew) t.team.members.push(v); else t.team.members[i] = v; await saveTrip(); render(); },
     onDelete: isNew ? null : async () => { t.team.members.splice(i, 1); await saveTrip(); render(); } });
+}
+
+/* ================= 大局觀 & 景點功課 ================= */
+const GUIDE_TABS = [
+  { k: "history", l: "人文歷史", s: "史", ph: "這裡為什麼長這樣？發生過什麼？有什麼傳說？" },
+  { k: "film", l: "微電影", s: "影", ph: "畫面設定、色調、人物狀態、分鏡、要跟攝影師說的話" },
+  { k: "shots", l: "機位姿勢", s: "位", ph: "" },
+  { k: "play", l: "玩法攻略", s: "玩", ph: "怎麼去、要預約嗎、怎麼排隊、站哪邊、避坑" }
+];
+function guideOf(it) { it.guide = it.guide || { history: "", film: "", play: "", shots: [] }; it.guide.shots = it.guide.shots || []; return it.guide; }
+function guideFilled(it, k) { const g = it.guide; if (!g) return false; return k === "shots" ? (g.shots || []).length > 0 : !!(g[k] && g[k].trim()); }
+function guideCount(it) { return GUIDE_TABS.filter(x => guideFilled(it, x.k)).length; }
+function guideBtn(it) {
+  return `<div class="meta"><button class="chip" data-guide="${it.id}" style="background:var(--ink);color:var(--paper)">景點功課</button>${GUIDE_TABS.map(x => `<span class="chip" style="${guideFilled(it, x.k) ? "" : "opacity:.35"}" title="${x.l}">${x.s}</span>`).join("")}</div>`;
+}
+function bigHTML(t) {
+  const b = t.big || {};
+  const has = b.land || b.history || b.people;
+  if (!has && !isOwner()) return "";
+  const row = (lab, sub, v) => v ? `<div><div class="eyebrow">${lab}・${sub}</div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(v)}</p></div>` : "";
+  return `<section class="section"><header><h2>大局觀・人文史地</h2>${isOwner() ? `<button class="btn sm ghost" data-act="editbig">${ICON.pen} 編輯</button>` : ""}</header>
+    ${has ? `<details class="card" open><summary>${esc((t.cities || [])[0] || country(t).name)}：地 → 史 → 人</summary><div class="stack" style="margin-top:10px">
+      ${row("地", "為什麼長這樣", b.land)}${row("史", "因此發生了什麼", b.history)}${row("人", "所以怎麼生活、吃什麼", b.people)}</div></details>`
+    : `<div class="card empty"><b>城市的大局觀</b>用「地 → 史 → 人」三格整理整個城市的人文史地。</div>`}</section>`;
+}
+function openBigEditor() {
+  const t = state.trip; t.big = t.big || {};
+  formSheet({ title: "大局觀・人文史地", fields: [
+    { k: "land", l: "地：地形、氣候、河流——為什麼長這樣", type: "textarea" },
+    { k: "history", l: "史：因為這樣的地理，發生了什麼", type: "textarea" },
+    { k: "people", l: "人：所以這裡的人怎麼生活、吃什麼、信什麼", type: "textarea" }], value: t.big,
+    async onSave(v) { t.big = v; await saveTrip(); render(); toast("已儲存"); } });
+}
+function findItem(id) { for (const d of state.trip.days) { const it = d.items.find(x => x.id === id); if (it) return it; } return null; }
+async function imgToDataURL(file, max = 1200) {
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", .8);
+}
+function openGuide(id, tab) {
+  const it = findItem(id); if (!it) return;
+  let cur = tab || (GUIDE_TABS.find(x => guideFilled(it, x.k)) || GUIDE_TABS[0]).k;
+  const sc = sheet(`<div><div class="eyebrow">景點功課</div><h2>${esc(it.title)}</h2></div>
+    <div class="seg" id="gtabs">${GUIDE_TABS.map(x => `<button data-gt="${x.k}">${x.l}</button>`).join("")}</div>
+    <div id="gbody"></div>`);
+  const body = $("#gbody", sc);
+  const draw = () => {
+    sc.querySelectorAll("[data-gt]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.gt === cur)));
+    const g = it.guide || {}, T = GUIDE_TABS.find(x => x.k === cur);
+    if (cur === "shots") {
+      const shots = g.shots || [];
+      body.innerHTML = `${shots.length ? `<div class="stack">${shots.map((s, i) => `<div class="card" style="padding:0;overflow:hidden">
+          ${s.img ? `<img src="${s.img}" alt="${esc(s.title || "機位參考")}" style="width:100%;max-height:340px;object-fit:cover;display:block">` : ""}
+          <div style="padding:12px"><div class="row" style="justify-content:space-between"><b>${esc(s.title || "機位 " + (i + 1))}</b>${isOwner() ? `<button class="btn sm ghost" data-shot="${i}">編輯</button>` : ""}</div>
+          ${s.pose ? `<p style="margin:6px 0 0;white-space:pre-wrap">${esc(s.pose)}</p>` : ""}</div></div>`).join("")}</div>`
+        : `<div class="card empty"><b>還沒有機位</b>放一張參考照，寫下站哪裡、怎麼擺。</div>`}
+        ${isOwner() ? `<button class="btn primary wide" data-shot="new" style="margin-top:10px">＋ 新增機位</button>` : ""}`;
+    } else {
+      const v = g[cur] || "";
+      body.innerHTML = `${v ? `<div class="card"><p style="margin:0;white-space:pre-wrap">${esc(v)}</p></div>` : `<div class="card empty"><b>還沒寫${T.l}</b>${esc(T.ph)}</div>`}
+        ${cur === "history" && (it.ktags || []).length ? `<div class="row" style="margin-top:10px">${it.ktags.map(k => `<button class="chip" data-ktag="${esc(k)}">#${esc(k)}</button>`).join("")}</div>` : ""}
+        ${it.link && cur === "history" ? `<p><a href="${esc(it.link)}" target="_blank" rel="noopener">▶ ${esc(it.linkTitle || "延伸閱讀")}</a></p>` : ""}
+        ${isOwner() ? `<button class="btn wide" data-gedit style="margin-top:10px">${ICON.pen} ${v ? "編輯" : "開始寫"}${T.l}</button>` : ""}`;
+    }
+  };
+  draw();
+  sc.addEventListener("click", e => {
+    const gt = e.target.closest("[data-gt]"); if (gt) { cur = gt.dataset.gt; return draw(); }
+    const kt = e.target.closest("[data-ktag]"); if (kt) { sc._close(); return openKtag(kt.dataset.ktag); }
+    if (e.target.closest("[data-gedit]")) {
+      const T = GUIDE_TABS.find(x => x.k === cur); sc._close();
+      return formSheet({ title: `${it.title}・${T.l}`, fields: [{ k: "v", l: T.l, type: "textarea", ph: T.ph }], value: { v: (it.guide || {})[cur] || "" },
+        onMount(s2) { const ta = $("#f-v", s2); ta.style.minHeight = "45vh"; },
+        async onSave(v) { guideOf(it)[cur] = v.v; await saveTrip(); render(); setTimeout(() => openGuide(it.id, cur), 30); } });
+    }
+    const sh = e.target.closest("[data-shot]"); if (sh) { sc._close(); return openShotEditor(it, sh.dataset.shot === "new" ? null : Number(sh.dataset.shot)); }
+  });
+}
+function openShotEditor(it, idx) {
+  const g = guideOf(it), isNew = idx == null;
+  const s = isNew ? { id: uid("s"), title: "", pose: "", img: "" } : { ...g.shots[idx] };
+  formSheet({ title: isNew ? "新增機位" : "編輯機位", fields: [
+      { k: "title", l: "機位名稱", ph: "例如：千廝門大橋上遠拍" },
+      { k: "pose", l: "站位與姿勢", type: "textarea", ph: "站橋中間偏左、側身回頭，讓洪崖洞燈火佔畫面 2/3" }],
+    value: s,
+    extraHTML: `<label class="pick" id="shotpick" style="min-height:120px;overflow:hidden">${s.img ? `<img src="${s.img}" alt="" style="width:100%;max-height:220px;object-fit:cover">` : "📷 放一張參考照片"}<input id="shotimg" type="file" accept="image/*" class="vh"></label>`,
+    onMount(sc) { $("#shotimg", sc).addEventListener("change", async e => { const f = e.target.files[0]; if (!f) return; s.img = await imgToDataURL(f); $("#shotpick", sc).innerHTML = `<img src="${s.img}" alt="" style="width:100%;max-height:220px;object-fit:cover"><input id="shotimg" type="file" accept="image/*" class="vh">`; }); },
+    async onSave(v) { Object.assign(s, v); if (isNew) g.shots.push(s); else g.shots[idx] = s; await saveTrip(); render(); setTimeout(() => openGuide(it.id, "shots"), 30); },
+    onDelete: isNew ? null : async () => { g.shots.splice(idx, 1); await saveTrip(); render(); setTimeout(() => openGuide(it.id, "shots"), 30); }
+  });
+}
+function openKtag(tag) {
+  const pool = isOwner() ? state.trips : [state.trip], hits = [];
+  pool.forEach(t => t.days.forEach((d, di) => d.items.forEach(it => { if ((it.ktags || []).includes(tag)) hits.push({ t, di, it }); })));
+  const sc = sheet(`<div><div class="eyebrow">知識標籤</div><h2>#${esc(tag)}</h2></div>
+    <p class="hint">你去過或規劃過、跟「${esc(tag)}」有關的地方：</p>
+    <div class="stack">${hits.map((h, i) => `<button class="tripcard" data-hit="${i}" style="grid-template-columns:44px 1fr"><div class="cover" style="width:44px;height:44px;font-size:20px">${country(h.t).flag}</div>
+      <div style="min-width:0"><h3>${esc(h.it.title)}</h3><div class="sub">${esc(h.t.title)}・D${h.di}</div></div></button>`).join("")}</div>`);
+  sc.addEventListener("click", e => { const b = e.target.closest("[data-hit]"); if (!b) return; const h = hits[Number(b.dataset.hit)]; sc._close();
+    if (h.t.id !== state.trip.id) { state.trip = h.t; DB.notes(h.t.id).then(n => { state.notes = n; state.day = h.di; go(tripHash("day", h.di, "plan")); setTimeout(() => openGuide(h.it.id), 80); }); }
+    else { state.day = h.di; go(tripHash("day", h.di, "plan")); setTimeout(() => openGuide(h.it.id), 80); } });
 }
 
 /* ================= LINE notice ================= */
@@ -1009,12 +1117,15 @@ app.addEventListener("click", async e => {
     addgroup: () => formSheet({ title: "新增行李分類", fields: [{ k: "group", l: "分類名稱" }], async onSave(v) { if (!v.group) return false; state.trip.packing.push({ group: v.group, items: [] }); await saveTrip(); render(); } }),
     cleargroup: async () => { const g = Number(t.closest("[data-g]").dataset.g); state.trip.packing[g].items.forEach(i => i.ok = false); await saveTrip(); render(); },
     addapp: () => openRecEditor("apps"),
+    editbig: openBigEditor,
     editins: () => formSheet({ title: "旅遊保險（加密）", fields: [{ k: "co", l: "保險公司" }, { k: "tel", l: "海外急難救助電話" }, { k: "policy", l: "保單號碼" }, { k: "note", l: "備註", type: "textarea" }], value: state.trip.private.insurance, async onSave(v) { state.trip.private.insurance = v; await saveTrip(); render(); } }),
     editsafety: () => formSheet({ title: "就近醫院・防走丟", fields: [{ k: "hospital", l: "就近醫院" }, { k: "lostPlan", l: "防走丟方式" }], value: state.trip, async onSave(v) { state.trip.hospital = v.hospital; state.trip.lostPlan = v.lostPlan; await saveTrip(); render(); } })
   };
   if (act && A[act]) return A[act]();
   const cp = t.closest("[data-copy]"); if (cp) return copyText(cp.dataset.copy);
   const im = t.closest("[data-item]"); if (im) return openItemMenu(im.dataset.item);
+  const gd = t.closest("[data-guide]"); if (gd) return openGuide(gd.dataset.guide);
+  const kt = t.closest("[data-ktag]"); if (kt) return openKtag(kt.dataset.ktag);
   const rc = t.closest("[data-rec]"); if (rc) return openCompose({ itemId: rc.dataset.rec });
   const ins = t.closest("[data-insert]"); if (ins) return insertPoint(Number(ins.dataset.insert));
   const en = t.closest("[data-editnote]"); if (en) return openCompose({ note: state.notes.find(n => n.id === en.dataset.editnote) });
