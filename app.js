@@ -35,11 +35,12 @@ const DB = {
   open() {
     return new Promise(res => {
       try {
-        const r = indexedDB.open("world", 1);
+        const r = indexedDB.open("world", 2);
         r.onupgradeneeded = () => {
           const db = r.result;
-          db.createObjectStore("trips", { keyPath: "id" });
-          db.createObjectStore("notes", { keyPath: "id" }).createIndex("tripId", "tripId");
+          if (!db.objectStoreNames.contains("trips")) db.createObjectStore("trips", { keyPath: "id" });
+          if (!db.objectStoreNames.contains("notes")) db.createObjectStore("notes", { keyPath: "id" }).createIndex("tripId", "tripId");
+          if (!db.objectStoreNames.contains("friends")) db.createObjectStore("friends", { keyPath: "id" });
         };
         r.onsuccess = () => { DB.db = r.result; res(true); };
         r.onerror = () => res(false);
@@ -59,7 +60,10 @@ const DB = {
   notes(tripId) { return DB.db ? DB.req("notes", "readonly", s => s.index("tripId").getAll(tripId)) : Promise.resolve([]); },
   allNotes() { return DB.db ? DB.req("notes", "readonly", s => s.getAll()) : Promise.resolve([]); },
   putNote(n) { return DB.req("notes", "readwrite", s => s.put(n)); },
-  delNote(id) { return DB.req("notes", "readwrite", s => s.delete(id)); }
+  delNote(id) { return DB.req("notes", "readwrite", s => s.delete(id)); },
+  allFriends() { return DB.db ? DB.req("friends", "readonly", s => s.getAll()) : Promise.resolve([]); },
+  putFriend(f) { return DB.req("friends", "readwrite", s => s.put(f)); },
+  delFriend(id) { return DB.req("friends", "readwrite", s => s.delete(id)); }
 };
 
 /* ================= state & routing ================= */
@@ -67,7 +71,7 @@ const params = new URLSearchParams(location.search);
 const VIEWER_ID = params.get("t");
 const state = {
   viewer: !!VIEWER_ID,
-  trips: [], allNotes: [],
+  trips: [], allNotes: [], friends: [],
   trip: null, notes: [],
   view: "home", homeTab: "trips", tab: "overview", day: 0, dayMode: "plan",
   showCancelled: true, unlocked: null
@@ -191,7 +195,8 @@ const SV = {
   day: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
   mic: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`,
   prep: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M9 7V4h6v3M9 12l2 2 4-4"/></svg>`,
-  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 16l20-6-2-3-7 2-6-5-2 1 4 6-5 2-2-1-1 1z"/></svg>`
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 16l20-6-2-3-7 2-6-5-2 1 4 6-5 2-2-1-1 1z"/></svg>`,
+  friends: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c3 .2 5.5 2.6 5.5 5.8"/></svg>`
 };
 
 /* ================= HOME ================= */
@@ -260,8 +265,8 @@ function viewHomeTimeline() {
   }).join("")}</div></section>`).join("");
 }
 function viewHome() {
-  const sub = { trips: viewHomeTrips, map: viewHomeMap, timeline: viewHomeTimeline }[state.homeTab] || viewHomeTrips;
-  tabBar([{ k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:map", l: "足跡", svg: SV.map }, { k: "home:timeline", l: "時間線", svg: SV.time }], "home:" + state.homeTab);
+  const sub = { trips: viewHomeTrips, map: viewHomeMap, timeline: viewHomeTimeline, friends: viewFriends }[state.homeTab] || viewHomeTrips;
+  tabBar([{ k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:map", l: "足跡", svg: SV.map }, { k: "home:timeline", l: "時間線", svg: SV.time }, { k: "home:friends", l: "朋友", svg: SV.friends }], "home:" + state.homeTab);
   return `<div class="topbar"><span class="brand">World</span><button class="icon-btn" data-act="settings" aria-label="設定">${ICON.gear}</button></div>${sub()}`;
 }
 
@@ -294,6 +299,8 @@ function viewOverview() {
       return `<button class="ov t-${d.type}${i === ti ? " today" : ""}" data-day="${i}"><div class="d">D${i}<small>${x.m}/${x.d}（${x.w}）</small></div>
       <div style="min-width:0"><h3>${esc(d.title || "（未命名）")}</h3>${live.length ? `<div class="r">${esc(live.map(it => it.title).join(" → "))}</div>` : `<div class="r">還沒有行程</div>`}${d.stay ? `<div class="r">🏨 ${esc(d.stay)}</div>` : ""}</div></button>`; }).join("")}</div>
   </section>
+
+  ${isOwner() ? tripFriendsHTML(t) : ""}
 
   ${t.team ? `<section class="section"><header><h2>相見歡</h2>${isOwner() ? `<button class="btn sm ghost" data-act="addmember">＋ 團員</button>` : ""}</header>
     <div class="card"><div class="eyebrow">團員與分工（${t.team.members.length} 人）</div><div class="members">${t.team.members.map((m, i) => `<button class="member" ${isOwner() ? `data-member="${i}"` : "disabled"}><b>${esc(m.name)}</b><small>${esc(m.role)}</small><small>${esc(m.duty)}</small></button>`).join("")}</div></div>
@@ -805,6 +812,98 @@ function openKtag(tag) {
     else { state.day = h.di; go(tripHash("day", h.di, "plan")); setTimeout(() => openGuide(h.it.id), 80); } });
 }
 
+/* ================= 朋友 ================= */
+const CONTACT_KINDS = [["line", "LINE"], ["ig", "Instagram"], ["wechat", "微信"], ["whatsapp", "WhatsApp"], ["fb", "Facebook"], ["kakao", "KakaoTalk"], ["email", "Email"], ["phone", "電話"], ["other", "其他"]];
+function contactLink(c) {
+  const v = (c.v || "").trim(); if (!v) return "";
+  if (c.k === "ig") return "https://instagram.com/" + v.replace(/^@/, "");
+  if (c.k === "whatsapp") return "https://wa.me/" + v.replace(/[^\d]/g, "");
+  if (c.k === "fb" && /^https?:/.test(v)) return v;
+  if (c.k === "line" && /^https?:/.test(v)) return v;
+  return "";
+}
+function friendWhere(f) {
+  const t = state.trips.find(x => x.id === f.tripId);
+  const w = f.country ? worldOf(f.country) : (t ? country(t) : null);
+  const parts = [];
+  if (w) parts.push((w.f || w.flag) + " " + (f.city || w.n || w.name));
+  else if (f.city) parts.push(f.city);
+  if (t) parts.push(t.title);
+  return parts.join("・");
+}
+function friendCard(f) {
+  return `<button class="tripcard" data-friend="${esc(f.id)}"><div class="cover" style="border-radius:50%">${f.photo ? `<img src="${f.photo}" alt="">` : esc((f.name || "?").slice(0, 1))}</div>
+    <div style="min-width:0"><h3>${esc(f.name)}</h3><div class="sub">${esc(friendWhere(f))}</div>${f.met ? `<div class="sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.met)}</div>` : ""}</div></button>`;
+}
+function viewFriends() {
+  const F = [...state.friends].sort((a, b) => (b.metDate || "").localeCompare(a.metDate || ""));
+  if (!F.length) return `<div class="card empty" style="margin-top:12px"><b>旅途中認識的朋友</b>記下在哪裡認識、聊了什麼、怎麼聯絡，下次去那個國家就知道可以找誰。<div style="margin-top:14px"><button class="btn primary" data-newfriend="">＋ 新增朋友</button></div></div>`;
+  const byC = {}; F.forEach(f => { const t = state.trips.find(x => x.id === f.tripId); const code = f.country || (t && t.country) || "OTHER"; (byC[code] = byC[code] || []).push(f); });
+  return `<button class="btn primary wide" data-newfriend="" style="margin-top:8px">＋ 新增朋友</button>
+    <div class="stats" style="margin-top:12px"><div class="stat"><b>${F.length}</b><span>位朋友</span></div><div class="stat"><b>${Object.keys(byC).length}</b><span>個國家</span></div><div class="stat"><b>${new Set(F.map(f => f.tripId).filter(Boolean)).size}</b><span>趟旅行</span></div></div>
+    ${P.regions.map(R => { const codes = Object.keys(byC).filter(c => worldOf(c).r === R.r); if (!codes.length) return "";
+      return `<section class="section"><header><h2>${esc(R.r)}</h2></header>${codes.map(c => `<div class="eyebrow">${worldOf(c).f} ${esc(worldOf(c).n)}</div><div class="stack">${byC[c].map(friendCard).join("")}</div>`).join("")}</section>`; }).join("")}`;
+}
+function tripFriendsHTML(t) {
+  const F = state.friends.filter(f => f.tripId === t.id);
+  return `<section class="section"><header><h2>這趟認識的朋友</h2><button class="btn sm ghost" data-newfriend="${esc(t.id)}">＋ 朋友</button></header>
+    ${F.length ? `<div class="stack">${F.map(friendCard).join("")}</div>` : `<p class="hint">在旅途中認識新朋友時，按「＋ 朋友」記下來。</p>`}</section>`;
+}
+function openFriend(id) {
+  const f = state.friends.find(x => x.id === id); if (!f) return;
+  const t = state.trips.find(x => x.id === f.tripId);
+  const sc = sheet(`<div class="row" style="gap:14px;flex-wrap:nowrap"><div class="cover" style="width:72px;height:72px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-size:28px;overflow:hidden;flex:0 0 auto">${f.photo ? `<img src="${f.photo}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc((f.name || "?").slice(0, 1))}</div>
+      <div style="min-width:0"><h2>${esc(f.name)}</h2><div class="muted">${esc(friendWhere(f))}</div>${f.metDate ? `<div class="hint mono">認識於 ${esc(f.metDate)}</div>` : ""}</div></div>
+    ${f.met ? `<div><div class="eyebrow">怎麼認識的</div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(f.met)}</p></div>` : ""}
+    ${(f.contacts || []).length ? `<div class="card">${f.contacts.map(c => { const lab = (CONTACT_KINDS.find(k => k[0] === c.k) || [0, c.k])[1]; const url = contactLink(c);
+      return `<div class="tel"><div class="n">${esc(lab)}<small style="user-select:all">${esc(c.v)}</small></div><div class="row" style="flex-wrap:nowrap">${url ? `<a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">開啟</a>` : ""}<button class="btn sm" data-copyc="${esc(c.v)}">複製</button></div></div>`; }).join("")}</div>` : ""}
+    ${f.notes ? `<div><div class="eyebrow">筆記</div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(f.notes)}</p></div>` : ""}
+    ${(f.tags || []).length ? `<div class="row">${f.tags.map(x => `<span class="chip">${esc(x)}</span>`).join("")}</div>` : ""}
+    <div class="row">${t ? `<button class="btn" data-gotrip>看這趟旅行</button>` : ""}<button class="btn primary" data-editf>${ICON.pen} 編輯</button></div>`);
+  sc.addEventListener("click", e => {
+    const c = e.target.closest("[data-copyc]"); if (c) return copyText(c.dataset.copyc);
+    if (e.target.closest("[data-editf]")) { sc._close(); return openFriendEditor(f); }
+    if (e.target.closest("[data-gotrip]")) { sc._close(); state.trip = null; return go(`#/trip/${encodeURIComponent(t.id)}/overview`); }
+  });
+}
+function openFriendEditor(f, preset = {}) {
+  const isNew = !f;
+  f = f ? clone(f) : { id: uid("f"), name: "", tripId: preset.tripId || "", country: "", city: "", metDate: "", met: "", contacts: [], notes: "", tags: [], photo: "" };
+  if (isNew && f.tripId) { const t = state.trips.find(x => x.id === f.tripId); if (t) { f.country = t.country; f.city = (t.cities || [])[0] || ""; f.metDate = (todayISO() >= t.start && todayISO() <= t.end) ? todayISO() : t.start; } }
+  const tripOpts = [["", "（不屬於某趟旅行）"]].concat([...state.trips].sort((a, b) => a.start < b.start ? 1 : -1).map(t => [t.id, country(t).flag + " " + t.title]));
+  const contactRows = () => f.contacts.map((c, i) => `<div class="row" style="flex-wrap:nowrap"><select data-ck="${i}" aria-label="聯絡方式" style="width:auto;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--paper)">${CONTACT_KINDS.map(k => `<option value="${k[0]}" ${k[0] === c.k ? "selected" : ""}>${k[1]}</option>`).join("")}</select>
+      <input data-cv="${i}" value="${esc(c.v)}" placeholder="帳號、ID 或連結" aria-label="帳號" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--paper)"><button class="icon-btn" type="button" data-crm="${i}" aria-label="移除">×</button></div>`).join("");
+  formSheet({
+    title: isNew ? "新增朋友" : "編輯朋友",
+    fields: [
+      { k: "name", l: "名字／暱稱" },
+      { k: "tripId", l: "在哪趟旅行認識", type: "select", options: tripOpts },
+      { k: "country", l: "朋友住在哪個國家", type: "select", options: COUNTRY_OPTS(), half: true }, { k: "city", l: "城市", half: true },
+      { k: "metDate", l: "認識的日期", type: "date" },
+      { k: "met", l: "怎麼認識的", type: "textarea", ph: "在青旅交誼廳一起看球賽，他推薦了一家巷子裡的小麵店" },
+      { k: "notes", l: "筆記", type: "textarea", ph: "喜歡什麼、生日、下次見面想帶的禮物、會說的語言" },
+      { k: "tags", l: "標籤（一行一個）", type: "lines", ph: "在地嚮導\n攝影\n同好" }
+    ],
+    value: { ...f, country: f.country || "OTHER" },
+    extraHTML: `<div class="field"><label>聯絡方式</label><div class="stack" id="crows">${contactRows()}</div><button class="btn sm" type="button" id="cadd" style="align-self:flex-start">＋ 聯絡方式</button></div>
+      <label class="pick" id="fpick" style="min-height:96px;overflow:hidden">${f.photo ? `<img src="${f.photo}" alt="" style="max-height:160px;object-fit:cover">` : "📷 大頭照或合照"}<input id="fphoto" type="file" accept="image/*" class="vh"></label>`,
+    onMount(sc) {
+      const sync = () => { sc.querySelectorAll("[data-ck]").forEach(el => f.contacts[el.dataset.ck].k = el.value); sc.querySelectorAll("[data-cv]").forEach(el => f.contacts[el.dataset.cv].v = el.value); };
+      $("#cadd", sc).addEventListener("click", () => { sync(); f.contacts.push({ k: "line", v: "" }); $("#crows", sc).innerHTML = contactRows(); });
+      $("#crows", sc).addEventListener("click", e => { const b = e.target.closest("[data-crm]"); if (b) { sync(); f.contacts.splice(Number(b.dataset.crm), 1); $("#crows", sc).innerHTML = contactRows(); } });
+      $("#crows", sc).addEventListener("input", sync); $("#crows", sc).addEventListener("change", sync);
+      $("#fphoto", sc).addEventListener("change", async e => { const file = e.target.files[0]; if (!file) return; f.photo = await imgToDataURL(file, 480); $("#fpick", sc).innerHTML = `<img src="${f.photo}" alt="" style="max-height:160px;object-fit:cover"><input id="fphoto" type="file" accept="image/*" class="vh">`; });
+      $("#f-tripId", sc).addEventListener("change", e => { const t = state.trips.find(x => x.id === e.target.value); if (t) { $("#f-country", sc).value = t.country; if (!$("#f-city", sc).value) $("#f-city", sc).value = (t.cities || [])[0] || ""; } });
+    },
+    async onSave(v) {
+      if (!v.name) { toast("請填名字"); return false; }
+      Object.assign(f, v, { country: v.country === "OTHER" ? "" : v.country, contacts: f.contacts.filter(c => (c.v || "").trim()) });
+      await DB.putFriend(f); state.friends = await DB.allFriends(); render(); toast("已儲存");
+    },
+    onDelete: isNew ? null : async () => { await DB.delFriend(f.id); state.friends = await DB.allFriends(); render(); }
+  });
+}
+
 /* ================= LINE notice ================= */
 function lineText(i) {
   const t = state.trip, d = t.days[i], x = md(d.date), n = d.notice;
@@ -1093,6 +1192,7 @@ async function exportAll() {
   zip.file("trips.json", JSON.stringify(state.trips, null, 1));
   const meta = notes.map(n => ({ ...n, media: (n.media || []).map((m, i) => { const f = `media/${n.tripId}/${n.id}-${i}.${extFor(m.type || m.blob.type)}`; zip.file(f, m.blob); return { kind: m.kind, type: m.type, file: f }; }) }));
   zip.file("notes.json", JSON.stringify(meta, null, 1));
+  zip.file("friends.json", JSON.stringify(await DB.allFriends(), null, 1));
   const blob = await zip.generateAsync({ type: "blob" });
   shareFile(new Blob([blob], { type: "application/zip" }), `World-備份-${todayISO()}.zip`);
 }
@@ -1103,6 +1203,7 @@ async function importAll(file) {
     const trips = JSON.parse(await zip.file("trips.json").async("string"));
     const notes = zip.file("notes.json") ? JSON.parse(await zip.file("notes.json").async("string")) : [];
     for (const t of trips) await DB.putTrip(t);
+    if (zip.file("friends.json")) for (const f of JSON.parse(await zip.file("friends.json").async("string"))) await DB.putFriend(f);
     for (const n of notes) { n.media = await Promise.all((n.media || []).map(async m => ({ kind: m.kind, type: m.type, blob: new Blob([await zip.file(m.file).async("arraybuffer")], { type: m.type }) }))); await DB.putNote(n); }
     await boot(); toast(`已匯入 ${trips.length} 趟旅行、${notes.length} 則紀錄`);
   } catch (e) { toast("匯入失敗：檔案不是 World 備份"); }
@@ -1126,6 +1227,8 @@ tabsEl.addEventListener("click", e => {
 app.addEventListener("click", async e => {
   const t = e.target;
   const nav = t.closest("[data-nav]"); if (nav) return go(nav.dataset.nav);
+  const fr = t.closest("[data-friend]"); if (fr) return openFriend(fr.dataset.friend);
+  const nf = t.closest("[data-newfriend]"); if (nf) return openFriendEditor(null, nf.dataset.newfriend ? { tripId: nf.dataset.newfriend } : {});
   const gb = t.closest("[data-groupby]"); if (gb) { ls.set("groupBy", gb.dataset.groupby); return render(); }
   const op = t.closest("[data-open]"); if (op) { state.day = 0; return go(`#/trip/${encodeURIComponent(op.dataset.open)}/overview`); }
   const dayB = t.closest("[data-day]"); if (dayB) { state.day = Number(dayB.dataset.day); return go(tripHash("day", state.day)); }
@@ -1201,6 +1304,7 @@ async function boot() {
   await DB.open();
   state.trips = await DB.allTrips();
   state.allNotes = await DB.allNotes();
+  state.friends = await DB.allFriends();
   state.trip = null;
   await route();
 }
