@@ -24,7 +24,10 @@ async function copyText(txt, el) {
   try { await navigator.clipboard.writeText(txt); toast("已複製"); }
   catch (e) { if (el && el.select) { el.focus(); el.select(); } toast("請長按選取後複製"); }
 }
-const country = t => P.countries[t && t.country] || P.countries.OTHER;
+const worldOf = code => P.world.find(w => w.c === code) || P.world.find(w => w.c === "OTHER");
+const country = t => { const code = t && t.country; const pre = P.countries[code]; const w = worldOf(code);
+  if (pre) return { ...pre, region: w.r, sub: w.s };
+  const o = P.countries.OTHER; return { ...o, name: w.n, flag: w.f, region: w.r, sub: w.s }; };
 
 /* ================= storage ================= */
 const DB = {
@@ -94,7 +97,7 @@ function sortItems(items) {
   }).map(x => x[0]);
 }
 function newTrip({ title, countryCode, cities, start, end }) {
-  const c = P.countries[countryCode] || P.countries.OTHER;
+  const c = country({ country: countryCode });
   const n = Math.max(1, dayCount(start, end));
   const days = [];
   for (let i = 0; i < n; i++) days.push(newDay(addDays(start, i)));
@@ -211,9 +214,20 @@ function viewHomeTrips() {
   const T = [...state.trips].sort((a, b) => a.start < b.start ? -1 : 1);
   const now = T.filter(t => tripStatus(t) === "now"), up = T.filter(t => tripStatus(t) === "upcoming"), past = T.filter(t => tripStatus(t) === "past").reverse();
   const sec = (title, list) => list.length ? `<section class="section"><header><h2>${title}</h2><span class="muted">${list.length}</span></header><div class="stack">${list.map(tripCard).join("")}</div></section>` : "";
+  const byRegion = ls.get("groupBy", "status") === "region";
+  const toggle = T.length ? `<div class="seg" style="margin-top:12px"><button data-groupby="status" aria-pressed="${!byRegion}">依狀態</button><button data-groupby="region" aria-pressed="${byRegion}">依地區</button></div>` : "";
+  if (byRegion && T.length) return `<button class="btn primary wide" data-act="newtrip" style="margin-top:8px">＋ 新增旅行</button>${toggle}${regionSections(T)}`;
   return `${!T.length ? `<div class="card empty" style="margin-top:12px"><b>開始第一趟旅行</b>按「新增旅行」，選國家和日期，模板會幫你排好骨架。<div class="row" style="justify-content:center;margin-top:14px"><button class="btn primary" data-act="newtrip">＋ 新增旅行</button><button class="btn ghost" data-act="sample">載入重慶範例</button></div></div>` :
-    `<button class="btn primary wide" data-act="newtrip" style="margin-top:8px">＋ 新增旅行</button>`}
+    `<button class="btn primary wide" data-act="newtrip" style="margin-top:8px">＋ 新增旅行</button>${toggle}`}
     ${sec("旅途中", now)}${sec("即將出發", up)}${sec("去過", past)}`;
+}
+function regionSections(T) {
+  return P.regions.map(R => {
+    const inR = T.filter(t => country(t).region === R.r); if (!inR.length) return "";
+    const subs = R.subs.map(sb => { const l = inR.filter(t => country(t).sub === sb).sort((a, b) => a.start < b.start ? 1 : -1); if (!l.length) return "";
+      return `${R.subs.length > 1 ? `<div class="eyebrow" style="margin-top:6px">${esc(sb)}</div>` : ""}<div class="stack">${l.map(tripCard).join("")}</div>`; }).join("");
+    return `<section class="section"><header><h2>${esc(R.r)}</h2><span class="muted">${inR.length} 趟</span></header>${subs}</section>`;
+  }).join("");
 }
 function visitedStats() {
   const done = state.trips.filter(t => tripStatus(t) !== "upcoming");
@@ -221,9 +235,15 @@ function visitedStats() {
   done.forEach(t => { countries.add(t.country); (t.cities || []).forEach(c => cities.set(c, country(t).flag)); });
   return { trips: done.length, countries: countries.size, cities };
 }
+function regionChips() {
+  const done = state.trips.filter(t => tripStatus(t) !== "upcoming"); if (!done.length) return "";
+  return `<div class="card" style="margin-top:12px">${P.regions.map(R => { const cs = new Set(done.filter(t => country(t).region === R.r).map(t => t.country)); if (!cs.size) return "";
+    return `<div class="tel"><div class="n"><b>${esc(R.r)}</b><small>${[...cs].map(c => worldOf(c).f + " " + worldOf(c).n).join("、")}</small></div><span class="chip mono">${cs.size} 國</span></div>`; }).join("")}</div>`;
+}
 function viewHomeMap() {
   const s = visitedStats();
   return `<div class="stats" style="margin-top:8px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${s.cities.size}</b><span>城市</span></div><div class="stat"><b>${s.trips}</b><span>趟旅行</span></div></div>
+  ${regionChips()}
   ${s.cities.size ? `<div class="row" style="margin-top:12px">${[...s.cities].map(([c, f]) => `<span class="chip">${f} ${esc(c)}</span>`).join("")}</div>` : ""}
   <div id="map" style="margin-top:12px" role="region" aria-label="足跡地圖"></div>
   <p class="hint" style="margin-top:8px">地圖上的點來自：行程裡有座標的地點，以及每則紀錄當下的定位。</p>
@@ -459,7 +479,10 @@ function formSheet({ title, fields, value, onSave, onDelete, extraHTML, onMount 
     let val = v[fd.k]; if (fd.type === "lines") val = (val || []).join("\n");
     let input;
     if (fd.type === "textarea" || fd.type === "lines") input = `<textarea id="${id}" placeholder="${esc(fd.ph || "")}">${esc(val)}</textarea>`;
-    else if (fd.type === "select") input = `<select id="${id}">${fd.options.map(o => `<option value="${esc(o[0])}" ${String(val) === String(o[0]) ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
+    else if (fd.type === "select") { let last = null, h = "";
+      fd.options.forEach(o => { if (o[2] && o[2] !== last) { if (last) h += "</optgroup>"; h += `<optgroup label="${esc(o[2])}">`; last = o[2]; }
+        h += `<option value="${esc(o[0])}" ${String(val) === String(o[0]) ? "selected" : ""}>${esc(o[1])}</option>`; });
+      if (last) h += "</optgroup>"; input = `<select id="${id}">${h}</select>`; }
     else input = `<input id="${id}" type="${fd.type || "text"}" value="${esc(val)}" placeholder="${esc(fd.ph || "")}" autocomplete="off">`;
     return `<div class="field" ${fd.half ? `data-half` : ""}><label for="${id}">${esc(fd.l)}</label>${input}${fd.hint ? `<p class="hint">${esc(fd.hint)}</p>` : ""}</div>`;
   });
@@ -480,7 +503,7 @@ function menuSheet(title, items) {
 }
 
 /* ================= trip editing ================= */
-const COUNTRY_OPTS = () => Object.entries(P.countries).map(([k, c]) => [k, c.flag + " " + c.name]);
+const COUNTRY_OPTS = () => P.world.map(w => [w.c, w.f + " " + w.n, w.r + "・" + w.s]);
 function openNewTrip() {
   const start = addDays(todayISO(), 30);
   formSheet({
@@ -1103,6 +1126,7 @@ tabsEl.addEventListener("click", e => {
 app.addEventListener("click", async e => {
   const t = e.target;
   const nav = t.closest("[data-nav]"); if (nav) return go(nav.dataset.nav);
+  const gb = t.closest("[data-groupby]"); if (gb) { ls.set("groupBy", gb.dataset.groupby); return render(); }
   const op = t.closest("[data-open]"); if (op) { state.day = 0; return go(`#/trip/${encodeURIComponent(op.dataset.open)}/overview`); }
   const dayB = t.closest("[data-day]"); if (dayB) { state.day = Number(dayB.dataset.day); return go(tripHash("day", state.day)); }
   const mode = t.closest("[data-mode]"); if (mode) return go(tripHash("day", state.day, mode.dataset.mode));
