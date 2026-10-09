@@ -1,5 +1,5 @@
 /* World 的 OneDrive 同步：行程、筆記、朋友（IndexedDB）＋ 打包清單等設定
- * 照片／錄音／影片另外存成檔案（OneDrive 應用程式資料夾 /origina-world/），筆記裡只記檔名。
+ * 照片／錄音／影片另外存成檔案（OneDrive › 應用程式 › Origina › World › media），筆記裡只記檔名。
  * 金鑰類（GitHub token、Whisper key、團隊密碼）不上傳。 */
 (function () {
   const DB = window.WorldDB;
@@ -21,7 +21,7 @@
         const media = [];
         for (const [i, m] of (n.media || []).entries()) {
           const ref = keyOf(n, m, i);
-          if (!done[ref] && m.blob && m.blob.size) { await api.putBlob("origina-world/" + ref, m.blob); markUp(ref); }
+          if (!done[ref] && m.blob && m.blob.size) { await api.putBlob("World/media/" + ref, m.blob); markUp(ref); }
           const { blob, ...rest } = m; media.push({ ...rest, ref });
         }
         outNotes.push({ ...n, media });
@@ -38,7 +38,7 @@
         const media = [];
         for (const m of n.media || []) {
           let blob = have[m.ref];
-          if (!blob) { try { blob = await api.getBlob("origina-world/" + m.ref); } catch (e) { blob = null; } if (blob) markUp(m.ref); }
+          if (!blob) { try { blob = await api.getBlob("World/media/" + m.ref) || await api.getBlob("origina-world/" + m.ref); } catch (e) { blob = null; } if (blob) markUp(m.ref); }
           media.push({ ...m, blob: blob ? (blob.type ? blob : new Blob([blob], { type: m.type || "" })) : new Blob([], { type: m.type || "" }) });
         }
         notes.push({ ...n, media });
