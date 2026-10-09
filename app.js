@@ -65,6 +65,7 @@ const DB = {
   putFriend(f) { return DB.req("friends", "readwrite", s => s.put(f)); },
   delFriend(id) { return DB.req("friends", "readwrite", s => s.delete(id)); }
 };
+window.WorldDB = DB; // 給 world-sync.js（OneDrive 同步）用
 
 /* ================= state & routing ================= */
 const params = new URLSearchParams(location.search);
