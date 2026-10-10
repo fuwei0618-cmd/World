@@ -1340,7 +1340,28 @@ async function boot() {
   state.allNotes = await DB.allNotes();
   state.friends = await DB.allFriends();
   state.trip = null;
+  if (location.hash.startsWith("#/import/")) { await importTrips(location.hash.slice(9)); return; }
   await route();
+}
+/* 匯入歷年旅行（連結帶資料，不放在程式裡）：#/import/<base64url JSON [{title,country,cities,start,end}]> */
+async function importTrips(code) {
+  let list = [];
+  try { const b = atob(code.replace(/-/g, "+").replace(/_/g, "/")); list = JSON.parse(decodeURIComponent(escape(b))); } catch (e) { toast("匯入連結壞掉了"); history.replaceState(null, "", location.pathname + "#/home/map"); return route(); }
+  const exists = t => state.trips.some(x => x.start === t.start && x.title === t.title);
+  const todo = list.filter(t => !exists(t));
+  history.replaceState(null, "", location.pathname + "#/home/map"); await route();
+  const sc = sheet(`<h3 style="margin:0 0 6px">匯入歷年旅行</h3><p class="hint">共 ${list.length} 趟，其中 ${todo.length} 趟還沒有。匯入後每趟都可以再改國家、城市和名稱。</p>
+    <div style="max-height:46vh;overflow:auto;margin:8px 0">${list.map(t => `<div class="tel"><div class="n"><b>${esc(t.title)}</b><small>${t.start} → ${t.end}${exists(t) ? "・已存在" : ""}</small></div></div>`).join("")}</div>
+    <button class="btn primary wide" data-doimport ${todo.length ? "" : "disabled"}>匯入 ${todo.length} 趟</button>`);
+  sc.querySelector("[data-doimport]").addEventListener("click", async () => {
+    for (const v of todo) {
+      const t = newTrip({ title: v.title, countryCode: v.country || "OTHER", cities: v.cities || [], start: v.start, end: v.end });
+      t.days.forEach(d => { d.items = []; d.title = ""; });
+      t.imported = "入出國紀錄"; if (v.note) t.note = v.note; if (v.countries) t.countries = v.countries;
+      await DB.putTrip(t); state.trips.push(t);
+    }
+    sc._close(); render(); toast(`已匯入 ${todo.length} 趟`);
+  });
 }
 boot();
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
