@@ -255,7 +255,7 @@ function viewHomeMap() {
   <div class="stats" style="margin-top:12px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${s.cities.size}</b><span>城市</span></div><div class="stat"><b>${s.trips}</b><span>趟旅行</span></div></div>
   ${regionChips()}
   ${s.cities.size ? `<div class="row" style="margin-top:12px">${[...s.cities].map(([c, f]) => `<span class="chip">${f} ${esc(c)}</span>`).join("")}</div>` : ""}
-  <p class="hint" style="margin-top:8px">金色是去過的國家，綠色是即將出發的國家；圓點是行程裡有座標的地點和紀錄當下的定位。</p>
+  <p class="hint" style="margin-top:8px">金色是去過的地方，綠色是即將出發的地方（中國、美國這類大國只亮去過的城市）；圓點是行程裡有座標的地點和紀錄當下的定位。</p>
   <button class="btn ghost wide" data-act="kml" style="margin-top:10px">匯出到 Google 我的地圖（KML）</button>`;
 }
 function viewHomeTimeline() {
@@ -1123,16 +1123,42 @@ async function countryShapes() {
   const topo = await (await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json")).json();
   return (geoCache = topojson.feature(topo, topo.objects.countries).features);
 }
-async function drawCountries(m, hasPts) {
-  const today = isoOf(new Date()), been = new Set(), next = new Set();
-  state.trips.forEach(t => tripCountries(t).forEach(c => { const n = ISO_NUM[c]; if (n) (tripStatus(t) === "upcoming" ? next : been).add(n); }));
-  if (!been.size && !next.size) return;
-  let feats; try { feats = await countryShapes(); } catch (e) { return; }
-  if (m !== mapInst) return;
-  const pick = feats.filter(f => been.has(String(f.id)) || next.has(String(f.id)));
-  const layer = L.geoJSON(pick, { style: f => { const b = been.has(String(f.id)); return { color: b ? "#B8892E" : "#2E8B6E", weight: 1, fillColor: b ? "#E2B85C" : "#7CC7A4", fillOpacity: .55 }; } }).addTo(m);
-  layer.bringToBack();
-  if (!hasPts) m.fitBounds(layer.getBounds().pad(0.1), { maxZoom: 5 });
+/* 大國家只亮去過的城市，不整片塗色 */
+const BIG_COUNTRIES = new Set(["CN", "US", "RU", "CA", "AU", "BR", "IN", "AR", "KZ", "ID", "MX", "MN", "DZ", "SA", "CD", "LY", "SD", "IR", "PE", "CL"]);
+const CITY_GEO = { "重慶": [29.56, 106.55], "成都": [30.66, 104.06], "西藏": [29.65, 91.13], "拉薩": [29.65, 91.13], "長白山": [42.02, 128.06], "洛杉磯": [34.05, -118.24], "舊金山": [37.77, -122.42], "北京": [39.9, 116.4], "上海": [31.23, 121.47], "紐約": [40.71, -74.0], "哈爾濱": [45.8, 126.53], "西安": [34.34, 108.94], "香港": [22.3, 114.17] };
+function citiesOf(t) { const names = new Set(tripCountries(t).map(c => worldOf(c).n)); return (t.cities || []).map(c => String(c).trim()).filter(c => c && !names.has(c)); }
+async function geocode(t, city) {
+  t.cityGeo = t.cityGeo || {};
+  if (t.cityGeo[city]) return t.cityGeo[city];
+  if (CITY_GEO[city]) return (t.cityGeo[city] = CITY_GEO[city]);
+  const key = "geo:" + city + "|" + t.country, hit = ls.get(key, null); if (hit) return (t.cityGeo[city] = hit);
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=zh-TW&countrycodes=${tripCountries(t).join(",").toLowerCase()}&q=${encodeURIComponent(city)}`);
+    const j = await r.json(); if (!j[0]) return null;
+    const g = [+(+j[0].lat).toFixed(3), +(+j[0].lon).toFixed(3)]; ls.set(key, g); await new Promise(z => setTimeout(z, 1100)); return (t.cityGeo[city] = g);
+  } catch (e) { return null; }
+}
+async function drawCountries(m) {
+  const been = new Set(), next = new Set(), spots = [];
+  state.trips.forEach(t => { const up = tripStatus(t) === "upcoming", cs = citiesOf(t);
+    tripCountries(t).forEach(c => { if (BIG_COUNTRIES.has(c) && cs.length) cs.forEach(city => spots.push({ t, city, up })); else { const n = ISO_NUM[c]; if (n) (up ? next : been).add(n); } }); });
+  if (!been.size && !next.size && !spots.length) return;
+  const all = L.featureGroup().addTo(m);
+  try {
+    const feats = await countryShapes(); if (m !== mapInst) return;
+    const pick = feats.filter(f => been.has(String(f.id)) || next.has(String(f.id)));
+    L.geoJSON(pick, { style: f => { const b = been.has(String(f.id)); return { color: b ? "#B8892E" : "#2E8B6E", weight: 1, fillColor: b ? "#E2B85C" : "#7CC7A4", fillOpacity: .55 }; } }).addTo(all);
+  } catch (e) {}
+  const changed = new Set();
+  for (const sp of spots) {
+    const had = sp.t.cityGeo && sp.t.cityGeo[sp.city], g = await geocode(sp.t, sp.city); if (m !== mapInst) return; if (!g) continue;
+    if (!had) changed.add(sp.t);
+    const col = sp.up ? "#2E8B6E" : "#B8892E", fill = sp.up ? "#7CC7A4" : "#E2B85C";
+    L.circleMarker(g, { radius: 14, stroke: false, fillColor: fill, fillOpacity: .3 }).addTo(all);
+    L.circleMarker(g, { radius: 6, color: col, weight: 1.5, fillColor: fill, fillOpacity: .95 }).bindTooltip(sp.city, { permanent: true, direction: "right", offset: [6, 0], className: "citytip" }).addTo(all);
+  }
+  for (const t of changed) { try { await DB.putTrip(t); } catch (e) {} }
+  if (all.getLayers().length) m.fitBounds(all.getBounds().pad(0.15), { maxZoom: 5 });
 }
 function mountMap() {
   const el = $("#map"); if (!el) return;
@@ -1146,7 +1172,7 @@ function mountMap() {
       .bindPopup(`<b>${esc(p.title)}</b><br>${esc(p.trip)}・${esc(p.date)}`))).addTo(mapInst);
     mapInst.fitBounds(group.getBounds().pad(0.2), { maxZoom: 12 });
   }
-  drawCountries(mapInst, false);
+  drawCountries(mapInst);
 }
 function exportKML() {
   const pts = allPoints(); if (!pts.length) { toast("還沒有定位過的地點"); return; }

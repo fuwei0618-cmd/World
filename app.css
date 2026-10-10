@@ -220,3 +220,6 @@ details[open].card summary:after{content:"－"}
 .lightbox img,.lightbox video{width:100%;border-radius:12px;max-height:70vh;object-fit:contain;background:#000}
 .toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:999px;font-size:13px;z-index:40;max-width:90vw;text-align:center}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+.leaflet-tooltip.citytip{background:rgba(255,255,255,.88);border:0;box-shadow:0 1px 3px rgba(0,0,0,.18);font-size:11px;padding:1px 6px;border-radius:8px;color:#5a4a1e}
+.leaflet-tooltip.citytip:before{display:none}
