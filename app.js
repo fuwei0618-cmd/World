@@ -85,7 +85,7 @@ function parseHash() {
     state.view = "trip"; state.tripId = decodeURIComponent(h[1]);
     state.tab = h[2] || "overview";
     if (h[2] === "day") { state.day = Number(h[3]) || 0; state.dayMode = h[4] === "record" ? "record" : "plan"; }
-  } else { state.view = "home"; state.homeTab = h[1] || "trips"; }
+  } else { state.view = "home"; state.homeTab = h[1] || "map"; // 一打開先看足跡地圖 }
 }
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 function tripHash(tab, day, mode) {
@@ -248,10 +248,10 @@ function regionChips() {
 }
 function viewHomeMap() {
   const s = visitedStats();
-  return `<div class="stats" style="margin-top:8px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${s.cities.size}</b><span>城市</span></div><div class="stat"><b>${s.trips}</b><span>趟旅行</span></div></div>
+  return `<div id="map" style="margin-top:8px" role="region" aria-label="足跡地圖"></div>
+  <div class="stats" style="margin-top:12px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${s.cities.size}</b><span>城市</span></div><div class="stat"><b>${s.trips}</b><span>趟旅行</span></div></div>
   ${regionChips()}
   ${s.cities.size ? `<div class="row" style="margin-top:12px">${[...s.cities].map(([c, f]) => `<span class="chip">${f} ${esc(c)}</span>`).join("")}</div>` : ""}
-  <div id="map" style="margin-top:12px" role="region" aria-label="足跡地圖"></div>
   <p class="hint" style="margin-top:8px">地圖上的點來自：行程裡有座標的地點，以及每則紀錄當下的定位。</p>
   <button class="btn ghost wide" data-act="kml" style="margin-top:10px">匯出到 Google 我的地圖（KML）</button>`;
 }
@@ -267,7 +267,7 @@ function viewHomeTimeline() {
 }
 function viewHome() {
   const sub = { trips: viewHomeTrips, map: viewHomeMap, timeline: viewHomeTimeline, friends: viewFriends }[state.homeTab] || viewHomeTrips;
-  tabBar([{ k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:map", l: "足跡", svg: SV.map }, { k: "home:timeline", l: "時間線", svg: SV.time }, { k: "home:friends", l: "朋友", svg: SV.friends }], "home:" + state.homeTab);
+  tabBar([{ k: "home:map", l: "足跡", svg: SV.map }, { k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:timeline", l: "時間線", svg: SV.time }, { k: "home:friends", l: "朋友", svg: SV.friends }], "home:" + state.homeTab);
   return `<div class="topbar"><span class="brand">World</span><button class="icon-btn" data-act="settings" aria-label="設定">${ICON.gear}</button></div>${sub()}`;
 }
 
