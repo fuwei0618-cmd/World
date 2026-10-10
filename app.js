@@ -85,7 +85,7 @@ function parseHash() {
     state.view = "trip"; state.tripId = decodeURIComponent(h[1]);
     state.tab = h[2] || "overview";
     if (h[2] === "day") { state.day = Number(h[3]) || 0; state.dayMode = h[4] === "record" ? "record" : "plan"; }
-  } else { state.view = "home"; state.homeTab = h[1] || "map"; // 一打開先看足跡地圖 }
+  } else { state.view = "home"; state.homeTab = h[1] || "map"; /* 一打開先看足跡地圖 */ }
 }
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 function tripHash(tab, day, mode) {
