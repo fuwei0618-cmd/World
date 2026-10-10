@@ -235,16 +235,19 @@ function regionSections(T) {
     return `<section class="section"><header><h2>${esc(R.r)}</h2><span class="muted">${inR.length} 趟</span></header>${subs}</section>`;
   }).join("");
 }
+function tripCountries(t) { return ((t.countries && t.countries.length) ? t.countries : [t.country]).filter(c => c && c !== "OTHER"); }
 function visitedStats() {
   const done = state.trips.filter(t => tripStatus(t) !== "upcoming");
   const cities = new Map(), countries = new Set();
-  done.forEach(t => { countries.add(t.country); (t.cities || []).forEach(c => cities.set(c, country(t).flag)); });
+  done.forEach(t => { tripCountries(t).forEach(c => countries.add(c)); (t.cities || []).forEach(c => { const m = tripCountries(t).find(k => worldOf(k).n === c); cities.set(c, m ? worldOf(m).f : country(t).flag); }); });
   return { trips: done.length, countries: countries.size, cities };
 }
 function regionChips() {
   const done = state.trips.filter(t => tripStatus(t) !== "upcoming"); if (!done.length) return "";
-  return `<div class="card" style="margin-top:12px">${P.regions.map(R => { const cs = new Set(done.filter(t => country(t).region === R.r).map(t => t.country)); if (!cs.size) return "";
-    return `<div class="tel"><div class="n"><b>${esc(R.r)}</b><small>${[...cs].map(c => worldOf(c).f + " " + worldOf(c).n).join("、")}</small></div><span class="chip mono">${cs.size} 國</span></div>`; }).join("")}</div>`;
+  const all = new Set(); done.forEach(t => tripCountries(t).forEach(c => all.add(c)));
+  const todo = done.filter(t => !tripCountries(t).length).length;
+  return `<div class="card" style="margin-top:12px">${P.regions.map(R => { const cs = [...all].filter(c => country({ country: c }).region === R.r); if (!cs.length) return "";
+    return `<div class="tel"><div class="n"><b>${esc(R.r)}</b><small>${cs.map(c => worldOf(c).f + " " + worldOf(c).n).join("、")}</small></div><span class="chip mono">${cs.length} 國</span></div>`; }).join("")}${todo ? `<div class="tel"><div class="n"><b>待確認</b><small>還沒填國家的旅行，點進去改國家就會亮在地圖上</small></div><span class="chip mono">${todo} 趟</span></div>` : ""}</div>`;
 }
 function viewHomeMap() {
   const s = visitedStats();
@@ -252,7 +255,7 @@ function viewHomeMap() {
   <div class="stats" style="margin-top:12px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${s.cities.size}</b><span>城市</span></div><div class="stat"><b>${s.trips}</b><span>趟旅行</span></div></div>
   ${regionChips()}
   ${s.cities.size ? `<div class="row" style="margin-top:12px">${[...s.cities].map(([c, f]) => `<span class="chip">${f} ${esc(c)}</span>`).join("")}</div>` : ""}
-  <p class="hint" style="margin-top:8px">地圖上的點來自：行程裡有座標的地點，以及每則紀錄當下的定位。</p>
+  <p class="hint" style="margin-top:8px">金色是去過的國家，綠色是即將出發的國家；圓點是行程裡有座標的地點和紀錄當下的定位。</p>
   <button class="btn ghost wide" data-act="kml" style="margin-top:10px">匯出到 Google 我的地圖（KML）</button>`;
 }
 function viewHomeTimeline() {
@@ -1111,16 +1114,39 @@ function allPoints() {
   return pts;
 }
 const TRIP_COLORS = ["#C8402B", "#3A6EA5", "#2E8B6E", "#D9822B", "#7B5EA7", "#8A6A4F", "#1F8A99"];
+const ISO_NUM={"AW":"533","AF":"004","AO":"024","AI":"660","AX":"248","AL":"008","AD":"020","AE":"784","AR":"032","AM":"051","AS":"016","AQ":"010","TF":"260","AG":"028","AU":"036","AT":"040","AZ":"031","BI":"108","BE":"056","BJ":"204","BQ":"535","BF":"854","BD":"050","BG":"100","BH":"048","BS":"044","BA":"070","BL":"652","BY":"112","BZ":"084","BM":"060","BO":"068","BR":"076","BB":"052","BN":"096","BT":"064","BV":"074","BW":"072","CF":"140","CA":"124","CC":"166","CH":"756","CL":"152","CN":"156","CI":"384","CM":"120","CD":"180","CG":"178","CK":"184","CO":"170","KM":"174","CV":"132","CR":"188","CU":"192","CW":"531","CX":"162","KY":"136","CY":"196","CZ":"203","DE":"276","DJ":"262","DM":"212","DK":"208","DO":"214","DZ":"012","EC":"218","EG":"818","ER":"232","EH":"732","ES":"724","EE":"233","ET":"231","FI":"246","FJ":"242","FK":"238","FR":"250","FO":"234","FM":"583","GA":"266","GB":"826","GE":"268","GG":"831","GH":"288","GI":"292","GN":"324","GP":"312","GM":"270","GW":"624","GQ":"226","GR":"300","GD":"308","GL":"304","GT":"320","GF":"254","GU":"316","GY":"328","HK":"344","HM":"334","HN":"340","HR":"191","HT":"332","HU":"348","ID":"360","IM":"833","IN":"356","IO":"086","IE":"372","IR":"364","IQ":"368","IS":"352","IL":"376","IT":"380","JM":"388","JE":"832","JO":"400","JP":"392","KZ":"398","KE":"404","KG":"417","KH":"116","KI":"296","KN":"659","KR":"410","KW":"414","LA":"418","LB":"422","LR":"430","LY":"434","LC":"662","LI":"438","LK":"144","LS":"426","LT":"440","LU":"442","LV":"428","MO":"446","MF":"663","MA":"504","MC":"492","MD":"498","MG":"450","MV":"462","MX":"484","MH":"584","MK":"807","ML":"466","MT":"470","MM":"104","ME":"499","MN":"496","MP":"580","MZ":"508","MR":"478","MS":"500","MQ":"474","MU":"480","MW":"454","MY":"458","YT":"175","NA":"516","NC":"540","NE":"562","NF":"574","NG":"566","NI":"558","NU":"570","NL":"528","NO":"578","NP":"524","NR":"520","NZ":"554","OM":"512","PK":"586","PA":"591","PN":"612","PE":"604","PH":"608","PW":"585","PG":"598","PL":"616","PR":"630","KP":"408","PT":"620","PY":"600","PS":"275","PF":"258","QA":"634","RE":"638","RO":"642","RU":"643","RW":"646","SA":"682","SD":"729","SN":"686","SG":"702","GS":"239","SH":"654","SJ":"744","SB":"090","SL":"694","SV":"222","SM":"674","SO":"706","PM":"666","RS":"688","SS":"728","ST":"678","SR":"740","SK":"703","SI":"705","SE":"752","SZ":"748","SX":"534","SC":"690","SY":"760","TC":"796","TD":"148","TG":"768","TH":"764","TJ":"762","TK":"772","TM":"795","TL":"626","TO":"776","TT":"780","TN":"788","TR":"792","TV":"798","TW":"158","TZ":"834","UG":"800","UA":"804","UM":"581","UY":"858","US":"840","UZ":"860","VA":"336","VC":"670","VE":"862","VG":"092","VI":"850","VN":"704","VU":"548","WF":"876","WS":"882","YE":"887","ZA":"710","ZM":"894","ZW":"716","XK":"-99"};
+let geoCache = null;
+function loadJS(src) { return new Promise((ok, no) => { const e = document.createElement("script"); e.src = src; e.onload = ok; e.onerror = no; document.head.appendChild(e); }); }
+async function countryShapes() {
+  if (geoCache) return geoCache;
+  if (!window.topojson) await loadJS("https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js");
+  const topo = await (await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json")).json();
+  return (geoCache = topojson.feature(topo, topo.objects.countries).features);
+}
+async function drawCountries(m, hasPts) {
+  const today = isoOf(new Date()), been = new Set(), next = new Set();
+  state.trips.forEach(t => tripCountries(t).forEach(c => { const n = ISO_NUM[c]; if (n) (tripStatus(t) === "upcoming" ? next : been).add(n); }));
+  if (!been.size && !next.size) return;
+  let feats; try { feats = await countryShapes(); } catch (e) { return; }
+  if (m !== mapInst) return;
+  const pick = feats.filter(f => been.has(String(f.id)) || next.has(String(f.id)));
+  const layer = L.geoJSON(pick, { style: f => { const b = been.has(String(f.id)); return { color: b ? "#B8892E" : "#2E8B6E", weight: 1, fillColor: b ? "#E2B85C" : "#7CC7A4", fillOpacity: .55 }; } }).addTo(m);
+  layer.bringToBack();
+  if (!hasPts) m.fitBounds(layer.getBounds().pad(0.1), { maxZoom: 5 });
+}
 function mountMap() {
   const el = $("#map"); if (!el) return;
   if (!window.L) { el.innerHTML = `<div class="empty"><b>地圖載入中</b>需要網路連線</div>`; return; }
-  mapInst = L.map(el, { zoomControl: true, attributionControl: true });
+  mapInst = L.map(el, { zoomControl: true, attributionControl: true, worldCopyJump: true });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapInst);
   const pts = allPoints();
-  if (!pts.length) { mapInst.setView([23.7, 121], 4); return; }
-  const group = L.featureGroup(pts.map(p => L.circleMarker([p.lat, p.lng], { radius: p.note ? 5 : 7, color: "#fff", weight: 2, fillColor: TRIP_COLORS[p.ti % TRIP_COLORS.length], fillOpacity: .95 })
-    .bindPopup(`<b>${esc(p.title)}</b><br>${esc(p.trip)}・${esc(p.date)}`))).addTo(mapInst);
-  mapInst.fitBounds(group.getBounds().pad(0.2), { maxZoom: 12 });
+  if (!pts.length) mapInst.setView([30, 60], 2);
+  else {
+    const group = L.featureGroup(pts.map(p => L.circleMarker([p.lat, p.lng], { radius: p.note ? 5 : 7, color: "#fff", weight: 2, fillColor: TRIP_COLORS[p.ti % TRIP_COLORS.length], fillOpacity: .95 })
+      .bindPopup(`<b>${esc(p.title)}</b><br>${esc(p.trip)}・${esc(p.date)}`))).addTo(mapInst);
+    mapInst.fitBounds(group.getBounds().pad(0.2), { maxZoom: 12 });
+  }
+  drawCountries(mapInst, false);
 }
 function exportKML() {
   const pts = allPoints(); if (!pts.length) { toast("還沒有定位過的地點"); return; }
