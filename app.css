@@ -223,3 +223,16 @@ details[open].card summary:after{content:"－"}
 
 .leaflet-tooltip.citytip{background:rgba(255,255,255,.88);border:0;box-shadow:0 1px 3px rgba(0,0,0,.18);font-size:11px;padding:1px 6px;border-radius:8px;color:#5a4a1e}
 .leaflet-tooltip.citytip:before{display:none}
+
+/* 旅行願景 */
+.visionEntry{display:grid;gap:2px;width:100%;text-align:left;margin-top:8px;border:0;cursor:pointer;color:var(--ink);font:inherit;background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--accent) 16%,var(--card)))}
+.visionEntry b{font-family:var(--f-display,inherit);font-size:17px}
+.vt{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:10px 12px;font:inherit;font-size:15px;line-height:1.6;resize:vertical;min-width:0}
+.reframe{display:grid;gap:4px;padding:10px 0;border-top:1px dashed var(--line)}
+.reframe .rq,.reframe .ra{display:flex;gap:6px;align-items:flex-start}
+.reframe .ra span{color:var(--accent);padding-top:10px;font-weight:700}
+.reframe .vt.q{background:var(--soft)}
+.tpl{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-left:22px;font-size:13px;color:var(--muted);line-height:1.6}.tpl span{flex:1 1 220px}
+.vx{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 6px;font-size:15px}.vx.big{font-size:20px;padding:8px 6px}
+.chip.vplace[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.section .row .btn{white-space:nowrap;flex:none}

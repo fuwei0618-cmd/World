@@ -4,7 +4,7 @@
 (function () {
   const DB = window.WorldDB;
   if (!DB || !window.OriginaSync) return;
-  const SYNC_LS = k => /^world:(pack:|niche$)/.test(k);
+  const SYNC_LS = k => /^world:(pack:|niche$|vision$)/.test(k);
   const UP = "world-sync-up";
   const up = () => { try { return JSON.parse(localStorage.getItem(UP) || "{}"); } catch (e) { return {}; } };
   const markUp = k => { const o = up(); o[k] = 1; localStorage.setItem(UP, JSON.stringify(o)); };

@@ -251,7 +251,8 @@ function regionChips() {
 }
 function viewHomeMap() {
   const s = visitedStats();
-  return `<div id="map" style="margin-top:8px" role="region" aria-label="足跡地圖"></div>
+  return `<button class="card visionEntry" data-nav="#/home/vision"><span class="eyebrow">MY TRAVEL VISION</span><b>我的旅行願景</b><span class="hint">想出發又卡住的時候，先來這裡看一下 →</span></button>
+  <div id="map" style="margin-top:8px" role="region" aria-label="足跡地圖"></div>
   <div class="stats" style="margin-top:12px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${s.cities.size}</b><span>城市</span></div><div class="stat"><b>${s.trips}</b><span>趟旅行</span></div></div>
   ${regionChips()}
   ${s.cities.size ? `<div class="row" style="margin-top:12px">${[...s.cities].map(([c, f]) => `<span class="chip">${f} ${esc(c)}</span>`).join("")}</div>` : ""}
@@ -269,10 +270,81 @@ function viewHomeTimeline() {
   }).join("")}</div></section>`).join("");
 }
 function viewHome() {
-  const sub = { trips: viewHomeTrips, map: viewHomeMap, timeline: viewHomeTimeline, friends: viewFriends }[state.homeTab] || viewHomeTrips;
+  const sub = { trips: viewHomeTrips, map: viewHomeMap, timeline: viewHomeTimeline, friends: viewFriends, vision: viewVision }[state.homeTab] || viewHomeTrips;
   tabBar([{ k: "home:map", l: "足跡", svg: SV.map }, { k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:timeline", l: "時間線", svg: SV.time }, { k: "home:friends", l: "朋友", svg: SV.friends }], "home:" + state.homeTab);
   return `<div class="topbar"><span class="brand">World</span><button class="icon-btn" data-act="settings" aria-label="設定">${ICON.gear}</button></div>${sub()}`;
 }
+
+/* ================= 旅行願景（跟 HH 信念板同一套：80 歲的我 → 為什麼 → 想成為的樣子 → 想去的地方 → 腦中的那句話 → 小勝利 → 出發前讀這段） ================= */
+const V_TPL = {
+  "我一個人的旅行老是取消、延期": "取消不是失敗，是還沒找到對的大小。先排一個兩天一夜、只要一個人就能成行的小旅行，排了就去。",
+  "我只會跟著別人的行程走，自己排不出來": "跟別人走也是旅行，而且我每一趟都學到怎麼排。我已經做了一整個旅行 App，我其實很會排。",
+  "我沒有錢，旅行太奢侈了": "旅行有很多價位。先決定一個地方、開一個旅費帳戶，每個月放一點；錢到了，票就買。",
+  "北美、南美、北歐那些地方太遠了，我這輩子去不了": "遠，所以要早一點排進金庫計畫。五年一個大洲，80 歲前走得完。",
+  "年紀越大越走不動": "所以現在去，順便好好重訓、上皮拉提斯。腳有力，80 歲也能走。",
+  "旅行回來只是花錢，什麼都沒留下": "我留下了影片、照片、地圖上的光點，還有回來後不一樣的自己。這些都在 World 裡。"
+};
+const V_PLACES0 = ["北美", "南美", "北歐", "俄羅斯–中國", "澳洲"];
+function visionData() {
+  const v = ls.get("vision", {}) || {};
+  v.at80 = v.at80 || ""; v.why = v.why || ""; v.note = v.note || "";
+  v.become = v.become && v.become.length ? v.become : ["", "", ""];
+  v.places = v.places || V_PLACES0.map(n => ({ n, done: false }));
+  v.reframes = v.reframes || Object.keys(V_TPL).map(q => ({ q, a: "" }));
+  v.wins = v.wins || [];
+  return v;
+}
+function saveVision(v) { ls.set("vision", v); }
+function viewVision() {
+  const v = visionData(), s = visitedStats(), ph = ["例如：一個人也敢訂機票出發", "例如：每趟旅行都剪成一支影片", "例如：在當地交到一個朋友"];
+  return `<button class="btn sm ghost" data-nav="#/home/map" style="margin-top:8px">← 回足跡</button>
+  <div class="card" style="margin-top:12px"><div class="eyebrow">MY TRAVEL VISION</div>
+    <div class="stats" style="margin-top:8px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${v.places.filter(p => p.done).length}/${v.places.length}</b><span>想去的地方</span></div><div class="stat"><b>${v.wins.length}</b><span>個小勝利</span></div></div></div>
+  <section class="section"><header><h2>80 歲的我，在旅行這件事上</h2></header><textarea class="vt" data-v="at80" rows="3" placeholder="範本：80 歲的我已經走過五大洲。現在每年還出門一趟，慢慢走、住久一點，晚上把照片放進 World，跟老朋友說那裡的故事。">${esc(v.at80)}</textarea></section>
+  <section class="section"><header><h2>我為什麼想旅行</h2></header><textarea class="vt" data-v="why" rows="3" placeholder="範本：在陌生的地方，我會重新看見自己。高中在 Getty Center 那種心流的感覺，我想一直遇到。">${esc(v.why)}</textarea></section>
+  <section class="section"><header><h2>我想成為的樣子</h2></header><div class="stack">${v.become.map((b, i) => `<input class="vt" data-vb="${i}" value="${esc(b)}" placeholder="${ph[i] || ""}">`).join("")}</div><button class="btn sm ghost" data-vact="vb-add" style="margin-top:8px">＋ 再加一個</button></section>
+  <section class="section"><header><h2>想去的地方</h2><span class="muted">去過就點一下</span></header>
+    <div class="row">${v.places.map((p, i) => `<button class="chip vplace" data-vact="pl-tog" data-i="${i}" aria-pressed="${p.done}">${p.done ? "✓ " : ""}${esc(p.n)}<span class="vx" data-vact="pl-del" data-i="${i}" aria-label="刪除">×</span></button>`).join("")}</div>
+    <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input class="vt" id="v-place" placeholder="再加一個地方"><button class="btn" data-vact="pl-add">加入</button></div></section>
+  <section class="section"><header><h2>腦中的那句話 → 我的回答</h2></header>
+    <p class="hint">想出發又退縮的時候，腦中通常會冒出這些話。先放了幾句，每句附一個範本回答，按「拿來改」改成你自己的話；用不到的就刪掉。</p>
+    ${v.reframes.map((r, i) => `<div class="reframe"><div class="rq"><textarea class="vt q" data-rq="${i}" rows="1" placeholder="腦中的那句話">${esc(r.q)}</textarea><button class="vx big" data-vact="rf-del" data-i="${i}" aria-label="刪除">×</button></div>
+      <div class="ra"><span aria-hidden="true">→</span><textarea class="vt" data-ra="${i}" rows="1" placeholder="我的回答">${esc(r.a)}</textarea></div>
+      ${!r.a && V_TPL[r.q] ? `<div class="tpl"><span>範本：${esc(V_TPL[r.q])}</span><button class="btn sm ghost" data-vact="tpl-use" data-i="${i}">拿來改 →</button></div>` : ""}</div>`).join("")}
+    <button class="btn sm ghost" data-vact="rf-add" style="margin-top:8px">＋ 再加一句</button>
+    <a class="hint" href="https://fuwei0618-cmd.github.io/Entry/mission/" target="_top" style="display:block;margin-top:8px">想拆深一點：去日晷的拆解室 →</a></section>
+  <section class="section"><header><h2>小勝利罐子</h2></header>
+    <p class="hint">查了機票、存了一筆旅費、排完一天行程，再小都記下來。</p>
+    <div class="row" style="flex-wrap:nowrap;margin-top:8px"><input class="vt" id="v-win" placeholder="例如：查了冰島的機票！"><button class="btn primary" data-vact="win-add">放進罐子</button></div>
+    <div class="row" style="margin-top:8px">${["查了一次機票", "存了一筆旅費", "排完一天行程", "自己訂了一間住宿", "剪完一支旅行影片", "跟別人說了我想去哪"].map(x => `<button class="chip" data-vact="win-quick" data-t="${esc(x)}">${esc(x)}</button>`).join("")}</div>
+    ${v.wins.length ? `<div class="card" style="margin-top:10px">${v.wins.map((w, i) => [w, i]).reverse().map(([w, i]) => `<div class="tel"><div class="n">${esc(w.t)}<small class="mono">${esc(w.d)}</small></div><button class="vx big" data-vact="win-del" data-i="${i}" aria-label="刪除">×</button></div>`).join("")}</div>` : ""}</section>
+  <section class="section"><header><h2>出發前讀這段</h2></header><p class="hint">寫給猶豫中的自己。訂票前、出門前，先讀一遍。</p>
+    <textarea class="vt" data-v="note" rows="4" placeholder="範本：你不用等到有很多錢、很多時間才出發。先去一個小地方，去了就算贏。回來記得在地圖上點亮它。">${esc(v.note)}</textarea></section>`;
+}
+function fitVision() { app.querySelectorAll("textarea.vt").forEach(t => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }); }
+app.addEventListener("input", e => {
+  const t = e.target, d = t.dataset; if (d.v == null && d.vb == null && d.rq == null && d.ra == null) return;
+  const v = visionData();
+  if (d.v != null) v[d.v] = t.value; else if (d.vb != null) v.become[+d.vb] = t.value; else if (d.rq != null) v.reframes[+d.rq].q = t.value; else v.reframes[+d.ra].a = t.value;
+  saveVision(v); if (t.tagName === "TEXTAREA") { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }
+});
+app.addEventListener("click", e => {
+  const b = e.target.closest("[data-vact]"); if (!b) return; e.stopPropagation();
+  const v = visionData(), i = +b.dataset.i, today = todayISO();
+  switch (b.dataset.vact) {
+    case "vb-add": v.become.push(""); break;
+    case "pl-tog": v.places[i].done = !v.places[i].done; break;
+    case "pl-del": v.places.splice(i, 1); break;
+    case "pl-add": { const n = ($("#v-place").value || "").trim(); if (!n) return; v.places.push({ n, done: false }); break; }
+    case "rf-add": v.reframes.push({ q: "", a: "" }); break;
+    case "rf-del": v.reframes.splice(i, 1); break;
+    case "tpl-use": v.reframes[i].a = V_TPL[v.reframes[i].q] || ""; break;
+    case "win-add": { const x = ($("#v-win").value || "").trim(); if (!x) return; v.wins.push({ d: today, t: x }); break; }
+    case "win-quick": v.wins.push({ d: today, t: b.dataset.t }); toast("放進罐子了"); break;
+    case "win-del": v.wins.splice(i, 1); break;
+  }
+  saveVision(v); const y = window.scrollY; render(); window.scrollTo(0, y);
+}, true);
 
 /* ================= TRIP: overview ================= */
 function tripTop(title, extra = "") {
@@ -451,6 +523,7 @@ function render() {
   if (state.view === "home" && !state.viewer) {
     app.innerHTML = viewHome();
     if (state.homeTab === "map") mountMap();
+    if (state.homeTab === "vision") fitVision();
   } else {
     if (!state.trip) { app.innerHTML = `<div class="card empty" style="margin-top:24px"><b>找不到這趟旅行</b>${isOwner() ? `<a href="#/home/trips">回旅行列表</a>` : "請確認網址是否正確"}</div>`; tabsEl.innerHTML = ""; return; }
     const v = { overview: viewOverview, day: viewDay, prep: viewPrep, info: viewInfo }[state.tab] || viewOverview;
