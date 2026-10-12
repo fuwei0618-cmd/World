@@ -295,33 +295,33 @@ function visionData() {
   return v;
 }
 function saveVision(v) { ls.set("vision", v); }
+const vOpen = new Set((() => { try { return JSON.parse(localStorage.getItem("world-vopen") || "[]"); } catch (e) { return []; } })());
+document.addEventListener("toggle", e => { const d = e.target; if (!d.dataset || !d.dataset.vk) return; d.open ? vOpen.add(d.dataset.vk) : vOpen.delete(d.dataset.vk); localStorage.setItem("world-vopen", JSON.stringify([...vOpen])); if (d.open) fitVision(d); }, true);
+const vSec = (k, title, pv, body) => `<details class="vs" data-vk="${k}"${vOpen.has(k) ? " open" : ""}><summary><b>${title}</b><span class="pv">${pv}</span></summary><div class="vb">${body}</div></details>`;
+const vCut = (t, n = 22) => t ? esc(t.length > n ? t.slice(0, n) + "…" : t) : "<i>還沒寫</i>";
 function viewVision() {
   const v = visionData(), s = visitedStats(), ph = ["例如：一個人也敢訂機票出發", "例如：每趟旅行都剪成一支影片", "例如：在當地交到一個朋友"];
-  return `<button class="btn sm ghost" data-nav="#/home/map" style="margin-top:8px">← 回足跡</button>
-  <div class="card" style="margin-top:12px"><div class="eyebrow">MY TRAVEL VISION</div>
-    <div class="stats" style="margin-top:8px"><div class="stat"><b>${s.countries}</b><span>國家</span></div><div class="stat"><b>${v.places.filter(p => p.done).length}/${v.places.length}</b><span>想去的地方</span></div><div class="stat"><b>${v.wins.length}</b><span>個小勝利</span></div></div></div>
-  <section class="section"><header><h2>80 歲的我，在旅行這件事上</h2></header><textarea class="vt" data-v="at80" rows="3" placeholder="範本：80 歲的我已經走過五大洲。現在每年還出門一趟，慢慢走、住久一點，晚上把照片放進 World，跟老朋友說那裡的故事。">${esc(v.at80)}</textarea></section>
-  <section class="section"><header><h2>我為什麼想旅行</h2></header><textarea class="vt" data-v="why" rows="3" placeholder="範本：在陌生的地方，我會重新看見自己。高中在 Getty Center 那種心流的感覺，我想一直遇到。">${esc(v.why)}</textarea></section>
-  <section class="section"><header><h2>我想成為的樣子</h2></header><div class="stack">${v.become.map((b, i) => `<input class="vt" data-vb="${i}" value="${esc(b)}" placeholder="${ph[i] || ""}">`).join("")}</div><button class="btn sm ghost" data-vact="vb-add" style="margin-top:8px">＋ 再加一個</button></section>
-  <section class="section"><header><h2>想去的地方</h2><span class="muted">去過就點一下</span></header>
-    <div class="row">${v.places.map((p, i) => `<button class="chip vplace" data-vact="pl-tog" data-i="${i}" aria-pressed="${p.done}">${p.done ? "✓ " : ""}${esc(p.n)}<span class="vx" data-vact="pl-del" data-i="${i}" aria-label="刪除">×</span></button>`).join("")}</div>
-    <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input class="vt" id="v-place" placeholder="再加一個地方"><button class="btn" data-vact="pl-add">加入</button></div></section>
-  <section class="section"><header><h2>腦中的那句話 → 我的回答</h2></header>
-    <p class="hint">想出發又退縮的時候，腦中通常會冒出這些話。先放了幾句，每句附一個範本回答，按「拿來改」改成你自己的話；用不到的就刪掉。</p>
-    ${v.reframes.map((r, i) => `<div class="reframe"><div class="rq"><textarea class="vt q" data-rq="${i}" rows="1" placeholder="腦中的那句話">${esc(r.q)}</textarea><button class="vx big" data-vact="rf-del" data-i="${i}" aria-label="刪除">×</button></div>
-      <div class="ra"><span aria-hidden="true">→</span><textarea class="vt" data-ra="${i}" rows="1" placeholder="我的回答">${esc(r.a)}</textarea></div>
-      ${!r.a && V_TPL[r.q] ? `<div class="tpl"><span>範本：${esc(V_TPL[r.q])}</span><button class="btn sm ghost" data-vact="tpl-use" data-i="${i}">拿來改 →</button></div>` : ""}</div>`).join("")}
-    <button class="btn sm ghost" data-vact="rf-add" style="margin-top:8px">＋ 再加一句</button>
-    <a class="hint" href="https://fuwei0618-cmd.github.io/Entry/mission/" target="_top" style="display:block;margin-top:8px">想拆深一點：去日晷的拆解室 →</a></section>
-  <section class="section"><header><h2>小勝利罐子</h2></header>
-    <p class="hint">查了機票、存了一筆旅費、排完一天行程，再小都記下來。</p>
-    <div class="row" style="flex-wrap:nowrap;margin-top:8px"><input class="vt" id="v-win" placeholder="例如：查了冰島的機票！"><button class="btn primary" data-vact="win-add">放進罐子</button></div>
-    <div class="row" style="margin-top:8px">${["查了一次機票", "存了一筆旅費", "排完一天行程", "自己訂了一間住宿", "剪完一支旅行影片", "跟別人說了我想去哪"].map(x => `<button class="chip" data-vact="win-quick" data-t="${esc(x)}">${esc(x)}</button>`).join("")}</div>
-    ${v.wins.length ? `<div class="card" style="margin-top:10px">${v.wins.map((w, i) => [w, i]).reverse().map(([w, i]) => `<div class="tel"><div class="n">${esc(w.t)}<small class="mono">${esc(w.d)}</small></div><button class="vx big" data-vact="win-del" data-i="${i}" aria-label="刪除">×</button></div>`).join("")}</div>` : ""}</section>
-  <section class="section"><header><h2>出發前讀這段</h2></header><p class="hint">寫給猶豫中的自己。訂票前、出門前，先讀一遍。</p>
-    <textarea class="vt" data-v="note" rows="4" placeholder="範本：你不用等到有很多錢、很多時間才出發。先去一個小地方，去了就算贏。回來記得在地圖上點亮它。">${esc(v.note)}</textarea></section>`;
+  const ans = v.reframes.filter(r => r.a).length, bec = v.become.filter(Boolean), done = v.places.filter(p => p.done).length;
+  const NOTE = "你不用等到有很多錢、很多時間才出發。先去一個小地方，去了就算贏。回來記得在地圖上點亮它。";
+  return `<div class="vtop"><button class="btn sm ghost" data-nav="#/home/map">← 足跡</button><span class="hint mono">${s.countries} 國・想去 ${done}/${v.places.length}・${v.wins.length} 個小勝利</span></div>
+  <details class="vnote" data-vk="note"${vOpen.has("note") ? " open" : ""}><summary><span class="eyebrow">出發前讀這段</span><p>${esc(v.note || NOTE)}</p><span class="hint">${v.note ? "點一下修改" : "範本・點一下改成你的話"}</span></summary>
+    <textarea class="vt" data-v="note" rows="3" placeholder="範本：${NOTE}">${esc(v.note)}</textarea></details>
+  <div class="vlist">
+  ${vSec("at80", "80 歲的我", vCut(v.at80), `<textarea class="vt" data-v="at80" rows="2" placeholder="範本：80 歲的我已經走過五大洲。現在每年還出門一趟，慢慢走、住久一點，晚上把照片放進 World，跟老朋友說那裡的故事。">${esc(v.at80)}</textarea>`)}
+  ${vSec("why", "我為什麼想旅行", vCut(v.why), `<textarea class="vt" data-v="why" rows="2" placeholder="範本：在陌生的地方，我會重新看見自己。高中在 Getty Center 那種心流的感覺，我想一直遇到。">${esc(v.why)}</textarea>`)}
+  ${vSec("become", "想成為的樣子", bec.length ? bec.length + " 個" : "<i>還沒寫</i>", v.become.map((b, i) => `<input class="vt" data-vb="${i}" value="${esc(b)}" placeholder="${ph[i] || ""}">`).join("") + `<button class="vlink" data-vact="vb-add">＋ 再加一個</button>`)}
+  ${vSec("places", "想去的地方", `${done}/${v.places.length} 去過`, `<div class="row">${v.places.map((p, i) => `<button class="chip vplace" data-vact="pl-tog" data-i="${i}" aria-pressed="${p.done}">${p.done ? "✓ " : ""}${esc(p.n)}<span class="vx" data-vact="pl-del" data-i="${i}" aria-label="刪除">×</span></button>`).join("")}</div>
+    <div class="vrow"><input class="vt sm" id="v-place" placeholder="再加一個地方"><button class="btn sm" data-vact="pl-add">加入</button></div>`)}
+  ${vSec("rf", "腦中的那句話", `回答了 ${ans}/${v.reframes.length}`, `<p class="hint">點一句展開，寫下你的回答。</p>` + v.reframes.map((r, i) => `<details class="rf" data-vk="rf${i}"${vOpen.has("rf" + i) ? " open" : ""}><summary><span>${esc(r.q) || "<i>新的一句</i>"}</span><em class="${r.a ? "ok" : ""}">${r.a ? "✓" : "範本"}</em></summary>
+      <textarea class="vt" data-ra="${i}" rows="2" placeholder="我的回答">${esc(r.a)}</textarea>
+      ${!r.a && V_TPL[r.q] ? `<div class="tpl">範本：${esc(V_TPL[r.q])} <button class="vlink" data-vact="tpl-use" data-i="${i}">拿來改 →</button></div>` : ""}
+      <div class="vrow"><input class="vt sm" data-rq="${i}" value="${esc(r.q)}" placeholder="腦中的那句話"><button class="vx big" data-vact="rf-del" data-i="${i}" aria-label="刪除這句">×</button></div></details>`).join("") + `<div class="vrow"><button class="vlink" data-vact="rf-add">＋ 再加一句</button><a class="vlink" href="https://fuwei0618-cmd.github.io/Entry/mission/" target="_top">去拆解室拆深一點 →</a></div>`)}
+  ${vSec("wins", "小勝利罐子", v.wins.length ? `${v.wins.length} 顆・最近：${vCut(v.wins[v.wins.length - 1].t, 12)}` : "<i>還是空的</i>", `<div class="vrow"><input class="vt sm" id="v-win" placeholder="今天的小勝利"><button class="btn sm primary" data-vact="win-add">放進去</button></div>
+    <div class="row">${["查了一次機票", "存了一筆旅費", "排完一天行程", "自己訂了一間住宿", "剪完一支旅行影片", "跟別人說了我想去哪"].map(x => `<button class="chip" data-vact="win-quick" data-t="${esc(x)}">${esc(x)}</button>`).join("")}</div>
+    ${v.wins.length ? `<div>${v.wins.map((w, i) => [w, i]).reverse().map(([w, i]) => `<div class="vwin"><span class="mono hint">${esc(w.d.slice(5))}</span><span>${esc(w.t)}</span><button class="vx big" data-vact="win-del" data-i="${i}" aria-label="刪除">×</button></div>`).join("")}</div>` : ""}`)}
+  </div>`;
 }
-function fitVision() { app.querySelectorAll("textarea.vt").forEach(t => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }); }
+function fitVision(r = app) { r.querySelectorAll("textarea.vt").forEach(t => { if (!t.offsetParent) return; t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }); }
 app.addEventListener("input", e => {
   const t = e.target, d = t.dataset; if (d.v == null && d.vb == null && d.rq == null && d.ra == null) return;
   const v = visionData();
@@ -336,7 +336,7 @@ app.addEventListener("click", e => {
     case "pl-tog": v.places[i].done = !v.places[i].done; break;
     case "pl-del": v.places.splice(i, 1); break;
     case "pl-add": { const n = ($("#v-place").value || "").trim(); if (!n) return; v.places.push({ n, done: false }); break; }
-    case "rf-add": v.reframes.push({ q: "", a: "" }); break;
+    case "rf-add": v.reframes.push({ q: "", a: "" }); vOpen.add("rf" + (v.reframes.length - 1)); break;
     case "rf-del": v.reframes.splice(i, 1); break;
     case "tpl-use": v.reframes[i].a = V_TPL[v.reframes[i].q] || ""; break;
     case "win-add": { const x = ($("#v-win").value || "").trim(); if (!x) return; v.wins.push({ d: today, t: x }); break; }

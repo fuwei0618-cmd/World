@@ -224,15 +224,26 @@ details[open].card summary:after{content:"－"}
 .leaflet-tooltip.citytip{background:rgba(255,255,255,.88);border:0;box-shadow:0 1px 3px rgba(0,0,0,.18);font-size:11px;padding:1px 6px;border-radius:8px;color:#5a4a1e}
 .leaflet-tooltip.citytip:before{display:none}
 
-/* 旅行願景 */
+/* 旅行願景（精簡摺疊版） */
 .visionEntry{display:grid;gap:2px;width:100%;text-align:left;margin-top:8px;border:0;cursor:pointer;color:var(--ink);font:inherit;background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--accent) 16%,var(--card)))}
-.visionEntry b{font-family:var(--f-display,inherit);font-size:17px}
-.vt{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:10px 12px;font:inherit;font-size:15px;line-height:1.6;resize:vertical;min-width:0}
-.reframe{display:grid;gap:4px;padding:10px 0;border-top:1px dashed var(--line)}
-.reframe .rq,.reframe .ra{display:flex;gap:6px;align-items:flex-start}
-.reframe .ra span{color:var(--accent);padding-top:10px;font-weight:700}
-.reframe .vt.q{background:var(--soft)}
-.tpl{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-left:22px;font-size:13px;color:var(--muted);line-height:1.6}.tpl span{flex:1 1 220px}
-.vx{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 6px;font-size:15px}.vx.big{font-size:20px;padding:8px 6px}
+.visionEntry b{font-family:var(--f-display);font-size:17px}
+.vtop{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 10px}
+.vt{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);padding:8px 10px;font:inherit;font-size:15px;line-height:1.55;resize:vertical;min-width:0}.vt.sm{padding:6px 10px;font-size:14px}
+.vnote{background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--accent) 16%,var(--card)));border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.vnote summary{list-style:none;cursor:pointer;display:grid;gap:2px}.vnote summary::-webkit-details-marker{display:none}
+.vnote p{margin:0;font-family:var(--f-display);font-size:16px;line-height:1.6}.vnote .vt{margin-top:8px}
+.vlist{border-radius:14px;background:var(--card);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+.vs{border-top:1px solid var(--line)}.vs:first-child{border-top:0}
+.vs>summary{display:flex;align-items:baseline;gap:10px;padding:12px 14px;cursor:pointer;list-style:none}.vs>summary::-webkit-details-marker{display:none}
+.vs>summary::before{content:'›';color:var(--muted);transition:transform .15s;display:inline-block}.vs[open]>summary::before{transform:rotate(90deg)}
+.vs>summary b{font-size:15px;white-space:nowrap}.pv{margin-left:auto;color:var(--muted);font-size:13px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.pv i{font-style:normal;opacity:.7}
+.vb{display:grid;gap:8px;padding:0 14px 14px}
+.rf{border-top:1px dashed var(--line);padding:6px 0}.rf>summary{display:flex;gap:8px;align-items:baseline;cursor:pointer;list-style:none;font-size:14px;line-height:1.5}.rf>summary::-webkit-details-marker{display:none}
+.rf>summary span{flex:1}.rf>summary em{font-style:normal;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:0 7px;white-space:nowrap}.rf>summary em.ok{color:var(--ok);border-color:var(--ok)}
+.rf[open]{display:grid;gap:6px;padding-bottom:10px}
+.tpl{font-size:13px;color:var(--muted);line-height:1.6}
+.vrow{display:flex;gap:8px;align-items:center;justify-content:space-between}.vrow .vt{flex:1}.vrow .btn{white-space:nowrap;flex:none}
+.vlink{border:0;background:none;padding:0;color:var(--link);font:inherit;font-size:13px;cursor:pointer;text-decoration:none;justify-self:start}
+.vwin{display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding:2px 0;font-size:14px}.vwin span:nth-child(2){flex:1}
+.vx{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 6px;font-size:15px}.vx.big{font-size:18px;padding:4px 6px}
 .chip.vplace[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
-.section .row .btn{white-space:nowrap;flex:none}
