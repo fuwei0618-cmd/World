@@ -85,7 +85,7 @@ function parseHash() {
     state.view = "trip"; state.tripId = decodeURIComponent(h[1]);
     state.tab = h[2] || "overview";
     if (h[2] === "day") { state.day = Number(h[3]) || 0; state.dayMode = h[4] === "record" ? "record" : "plan"; }
-  } else { state.view = "home"; state.homeTab = h[1] || "map"; /* 一打開先看足跡地圖 */ }
+  } else { state.view = "home"; state.homeTab = h[1] || "trips"; /* 照 Origina 規則：第一格是最常用的「旅行」 */ }
 }
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 function tripHash(tab, day, mode) {
@@ -189,6 +189,7 @@ function tabBar(list, cur) {
     : `<button data-tab="${t.k}" aria-current="${t.k === cur}">${t.svg}${t.l}</button>`).join("");
 }
 const SV = {
+  clip: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 14v6M13.5 17h6"/></svg>`,
   trips: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M9 7V4h6v3"/></svg>`,
   map: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>`,
   time: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
@@ -271,8 +272,9 @@ function viewHomeTimeline() {
 }
 function viewHome() {
   const sub = { trips: viewHomeTrips, map: viewHomeMap, timeline: viewHomeTimeline, friends: viewFriends, vision: viewVision }[state.homeTab] || viewHomeTrips;
-  tabBar([{ k: "home:map", l: "足跡", svg: SV.map }, { k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:timeline", l: "時間線", svg: SV.time }, { k: "home:friends", l: "朋友", svg: SV.friends }], "home:" + state.homeTab);
-  return `<div class="topbar"><span class="brand">World</span><button class="icon-btn" data-act="settings" aria-label="設定">${ICON.gear}</button></div>${sub()}`;
+  tabBar([{ k: "home:trips", l: "旅行", svg: SV.trips }, { k: "home:friends", l: "朋友", svg: SV.friends }, { k: "home:map", l: "足跡", svg: SV.map }], "home:" + (state.homeTab === "timeline" ? "map" : state.homeTab));
+  const foot = state.homeTab === "map" || state.homeTab === "timeline";
+  return `<div class="topbar"><span class="brand">World</span><button class="icon-btn" data-act="settings" aria-label="設定">${ICON.gear}</button></div>${foot ? `<div class="seg" style="margin:4px 0 10px"><button data-nav="#/home/map" aria-pressed="${state.homeTab === "map"}">地圖</button><button data-nav="#/home/timeline" aria-pressed="${state.homeTab === "timeline"}">時間線</button></div>` : ""}${sub()}`;
 }
 
 /* ================= 旅行願景（跟 HH 信念板同一套：80 歲的我 → 為什麼 → 想成為的樣子 → 想去的地方 → 腦中的那句話 → 小勝利 → 出發前讀這段） ================= */
@@ -528,9 +530,9 @@ function render() {
     if (state.homeTab === "vision") fitVision();
   } else {
     if (!state.trip) { app.innerHTML = `<div class="card empty" style="margin-top:24px"><b>找不到這趟旅行</b>${isOwner() ? `<a href="#/home/trips">回旅行列表</a>` : "請確認網址是否正確"}</div>`; tabsEl.innerHTML = ""; return; }
-    const v = { overview: viewOverview, day: viewDay, prep: viewPrep, info: viewInfo }[state.tab] || viewOverview;
+    const v = { overview: viewOverview, collect: viewCollect, day: viewDay, prep: viewPrep, info: viewInfo }[state.tab] || viewOverview;
     app.innerHTML = v();
-    const list = [{ k: "overview", l: "總覽", svg: SV.home }, { k: "day", l: "每日", svg: SV.day }];
+    const list = [{ k: "overview", l: "總覽", svg: SV.home }, { k: "collect", l: "蒐集", svg: SV.clip }, { k: "day", l: "每日", svg: SV.day }];
     if (isOwner()) list.push({ k: "rec", l: "記錄", svg: SV.mic, rec: true });
     list.push({ k: "prep", l: "準備", svg: SV.prep }, { k: "info", l: "資訊", svg: SV.info });
     tabBar(list, state.tab);
@@ -711,7 +713,7 @@ function openItemEditor(it, onCreate) {
       if (isNew) { if (onCreate) onCreate(it); else d.items.push(it); }
       await saveTrip(); render(); toast("已儲存");
     },
-    onDelete: isNew ? null : async () => { d.items = d.items.filter(x => x !== it); await saveTrip(); render(); }
+    onDelete: isNew ? null : async () => { state.trip.pool = (state.trip.pool || []).filter(x => x !== it); state.trip.days.forEach(dd => { dd.items = dd.items.filter(x => x !== it); }); await saveTrip(); render(); }
   });
 }
 function openItemMenu(id) {
@@ -819,7 +821,62 @@ function openBigEditor() {
     { k: "people", l: "人：所以這裡的人怎麼生活、吃什麼、信什麼", type: "textarea" }], value: t.big,
     async onSave(v) { t.big = v; await saveTrip(); render(); toast("已儲存"); } });
 }
-function findItem(id) { for (const d of state.trip.days) { const it = d.items.find(x => x.id === id); if (it) return it; } return null; }
+function findItem(id) { for (const d of state.trip.days) { const it = d.items.find(x => x.id === id); if (it) return it; } return (state.trip.pool || []).find(x => x.id === id) || null; }
+
+/* ================= TRIP: 蒐集與規劃（最詳細的簡報區） =================
+   每個景點只有一份：還沒排的放在 trip.pool，排好的在某一天；
+   「每日」只顯示精簡版，點「景點功課」就回到這裡的詳細內容。 */
+const CLIP_TAGS = ["想吃", "想玩", "想住", "拍照點", "功課"];
+function allSpots(t) {
+  const out = (t.pool || []).map(it => ({ it, day: -1 }));
+  t.days.forEach((d, i) => d.items.forEach(it => { if (!it.journalOnly && it.status !== "cancel") out.push({ it, day: i }); }));
+  return out;
+}
+function viewCollect() {
+  const t = state.trip; t.pool = t.pool || [];
+  const f = state.cf || "all";
+  const all = allSpots(t);
+  const L = all.filter(x => f === "all" || (f === "pool" ? x.day < 0 : (x.it.tips || []).includes(f)));
+  const chip = (k, l, n) => `<button class="chip" data-cf="${k}" aria-pressed="${f === k}" style="${f === k ? "background:var(--ink);color:var(--paper)" : ""}">${l}${n != null ? ` ${n}` : ""}</button>`;
+  return `${tripTop(t.title)}
+  <p class="hint" style="margin-top:10px">這裡是最詳細的地方：看到喜歡的先丟進來，之後再排進第幾天。「每日」只顯示精簡版，點景點的「景點功課」就會回到這裡的內容。</p>
+  ${bigHTML(t).replace('<details class="card" open>', '<details class="card">')}
+  <section class="section"><header><h2>景點簡報</h2>${isOwner() ? `<button class="btn sm" data-act="addclip">＋ 丟進來</button>` : ""}</header>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">${chip("all", "全部", all.length)}${chip("pool", "還沒排", all.filter(x => x.day < 0).length)}${CLIP_TAGS.map(g => chip(g, g)).join("")}</div>
+    ${L.length ? `<div class="stack">${L.map(({ it, day }) => { const dd = day >= 0 ? md(t.days[day].date) : null; return `<div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><b style="font-size:16px">${esc(it.title)}</b><span class="chip" style="white-space:nowrap;${day < 0 ? "" : "background:var(--ink);color:var(--paper)"}">${day < 0 ? "還沒排" : `D${day}・${dd.m}/${dd.d}`}</span></div>
+      ${it.desc ? `<p class="desc" style="white-space:pre-wrap">${esc(it.desc)}</p>` : ""}
+      ${(it.place || (it.tips || []).length || it.link) ? `<div class="meta">${it.place ? `<a class="chip" href="${esc(mapURL(t, it))}" target="_blank" rel="noopener">${ICON.pin} ${esc(it.place)}</a>` : ""}${(it.tips || []).map(x => `<span class="chip">${esc(x)}</span>`).join("")}${it.link ? `<a class="chip" href="${esc(it.link)}" target="_blank" rel="noopener">▶ ${esc(it.linkTitle || "連結")}</a>` : ""}</div>` : ""}
+      ${guideBtn(it)}
+      ${isOwner() ? `<div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" data-move="${it.id}">${day < 0 ? "排進第幾天" : "換一天"}</button><button class="btn sm ghost" data-editclip="${it.id}">編輯</button></div>` : ""}
+    </div>`; }).join("")}</div>`
+    : `<div class="card empty"><b>${f === "all" ? "還沒有東西" : "這一類還沒有"}</b>${isOwner() ? "小紅書、IG、Google 地圖上看到喜歡的，按「＋ 丟進來」，貼連結、寫一句話就好。" : ""}</div>`}
+  </section>`;
+}
+function openClipEditor() {
+  const t = state.trip; t.pool = t.pool || [];
+  formSheet({ title: "丟進蒐集區", fields: [
+      { k: "title", l: "名稱", ph: "例如：大足石刻、某家火鍋" },
+      { k: "tips", l: "標籤（一行一個：想吃、想玩、想住、拍照點、功課）", type: "lines", ph: "想玩\n拍照點" },
+      { k: "link", l: "連結（小紅書、IG、YouTube…）", ph: "https://…" },
+      { k: "place", l: "地點（選填）" },
+      { k: "desc", l: "一句話筆記", type: "textarea" }],
+    value: { title: "", tips: [], link: "", place: "", desc: "" },
+    async onSave(v) { if (!v.title) { toast("請填名稱"); return false; } t.pool.push({ id: uid("i"), time: "", status: "plan", ...v }); await saveTrip(); render(); toast("已丟進蒐集區"); } });
+}
+function openMoveSpot(id) {
+  const t = state.trip; t.pool = t.pool || [];
+  const it = findItem(id); if (!it) return;
+  const sc = sheet(`<h2>${esc(it.title)}</h2><p class="hint">排進哪一天？之後隨時可以再換，或放回蒐集區。</p>
+    <div class="stack"><button class="btn wide" data-to="-1">還沒排（放回蒐集區）</button>${t.days.map((d, i) => { const x = md(d.date); return `<button class="btn wide" data-to="${i}">D${i}・${x.m}/${x.d}${d.title ? "　" + esc(d.title) : ""}</button>`; }).join("")}</div>`);
+  sc.addEventListener("click", async e => {
+    const b = e.target.closest("[data-to]"); if (!b) return;
+    const to = Number(b.dataset.to);
+    t.pool = t.pool.filter(x => x !== it); t.days.forEach(d => { d.items = d.items.filter(x => x !== it); });
+    if (to < 0) t.pool.push(it); else t.days[to].items.push(it);
+    await saveTrip(); sc._close(); render(); toast(to < 0 ? "放回蒐集區了" : `排進 D${to} 了`);
+  });
+}
 async function imgToDataURL(file, max = 1200) {
   const bmp = await createImageBitmap(file);
   const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
@@ -1393,11 +1450,14 @@ app.addEventListener("click", async e => {
   const op = t.closest("[data-open]"); if (op) { state.day = 0; return go(`#/trip/${encodeURIComponent(op.dataset.open)}/overview`); }
   const dayB = t.closest("[data-day]"); if (dayB) { state.day = Number(dayB.dataset.day); return go(tripHash("day", state.day)); }
   const mode = t.closest("[data-mode]"); if (mode) return go(tripHash("day", state.day, mode.dataset.mode));
+  const cfB = t.closest("[data-cf]"); if (cfB) { state.cf = cfB.dataset.cf; return render(); }
+  const mvB = t.closest("[data-move]"); if (mvB) return openMoveSpot(mvB.dataset.move);
+  const ecB = t.closest("[data-editclip]"); if (ecB) { const it = findItem(ecB.dataset.editclip); if (it) return openItemEditor(it); }
   const act = t.closest("[data-act]")?.dataset.act;
   const A = {
     newtrip: openNewTrip, sample: loadSample, settings: openSettings, kml: exportKML,
     tripmenu: openTripMenu, edittrip: openEditTrip, publish: openPublish, editday: openEditDay,
-    additem: () => openItemEditor(null), line: openLine, editteam: openTeamEditor,
+    additem: () => openItemEditor(null), addclip: openClipEditor, line: openLine, editteam: openTeamEditor,
     addteam: async () => { state.trip.team = { members: [], note: "", oath: [] }; await saveTrip(); render(); openMemberEditor(); },
     addmember: () => openMemberEditor(),
     togglecancel: () => { state.showCancelled = !state.showCancelled; render(); },
