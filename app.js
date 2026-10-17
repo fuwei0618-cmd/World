@@ -223,9 +223,9 @@ function viewHomeTrips() {
   const sec = (title, list) => list.length ? `<section class="section"><header><h2>${title}</h2><span class="muted">${list.length}</span></header><div class="stack">${list.map(tripCard).join("")}</div></section>` : "";
   const byRegion = ls.get("groupBy", "status") === "region";
   const toggle = T.length ? `<div class="seg" style="margin-top:12px"><button data-groupby="status" aria-pressed="${!byRegion}">依狀態</button><button data-groupby="region" aria-pressed="${byRegion}">依地區</button></div>` : "";
-  if (byRegion && T.length) return `<button class="btn primary wide" data-act="newtrip" style="margin-top:8px">＋ 新增旅行</button>${toggle}${regionSections(T)}`;
+  if (byRegion && T.length) return `${toggle}${regionSections(T)}`;
   return `${!T.length ? `<div class="card empty" style="margin-top:12px"><b>開始第一趟旅行</b>按「新增旅行」，選國家和日期，模板會幫你排好骨架。<div class="row" style="justify-content:center;margin-top:14px"><button class="btn primary" data-act="newtrip">＋ 新增旅行</button><button class="btn ghost" data-act="sample">載入重慶範例</button></div></div>` :
-    `<button class="btn primary wide" data-act="newtrip" style="margin-top:8px">＋ 新增旅行</button>${toggle}`}
+    toggle}
     ${sec("旅途中", now)}${sec("即將出發", up)}${sec("去過", past)}`;
 }
 function regionSections(T) {
@@ -452,7 +452,7 @@ function viewDay() {
       ${rec ? `<div class="insert"><button data-insert="0">＋ 插入記錄點</button></div>` : ""}
       ${items.length ? items.map((it, i) => itemHTML(it, { record: rec }) + (rec ? `<div class="insert"><button data-insert="${i + 1}">＋ 插入記錄點</button></div>` : "")).join("") : `<div class="empty"><b>這天還沒有行程</b>${isOwner() ? "按下方「新增行程」開始排" : ""}</div>`}
     </div>
-    ${isOwner() && !rec ? `<button class="btn ghost wide" data-act="additem">＋ 新增行程</button>` : ""}
+    
     ${loose.length ? `<div class="card"><div class="eyebrow">其他紀錄</div>${loose.map(noteHTML).join("")}</div>` : ""}
   </section>`;
 }
@@ -523,7 +523,15 @@ function viewInfo() {
 
 /* ================= render ================= */
 let mapInst = null;
+function setFab() {
+  const fb = $("#fab"); if (!fb) return; let d = "";
+  if (state.view === "home" && !state.viewer) d = state.homeTab === "trips" ? "newtrip" : state.homeTab === "friends" ? "friend" : "";
+  else if (state.trip && isOwner()) d = state.tab === "collect" ? "clip" : state.tab === "day" && state.dayMode !== "record" ? "item" : "rec";
+  fb.hidden = !d; fb.dataset.do = d;
+  fb.setAttribute("aria-label", { newtrip: "新增旅行", friend: "新增朋友", clip: "丟進蒐集", item: "新增行程", rec: "記錄" }[d] || "新增");
+}
 function render() {
+  setTimeout(setFab, 0);
   freeURLs();
   if (mapInst) { try { mapInst.remove(); } catch (e) {} mapInst = null; }
   if (state.view === "home" && !state.viewer) {
@@ -535,7 +543,6 @@ function render() {
     const v = { overview: viewOverview, collect: viewCollect, day: viewDay, prep: viewPrep, info: viewInfo }[state.tab] || viewOverview;
     app.innerHTML = v();
     const list = [{ k: "overview", l: "總覽", svg: SV.home }, { k: "collect", l: "蒐集", svg: SV.clip }, { k: "day", l: "每日", svg: SV.day }];
-    if (isOwner()) list.push({ k: "rec", l: "記錄", svg: SV.mic, rec: true });
     list.push({ k: "prep", l: "準備", svg: SV.prep }, { k: "info", l: "資訊", svg: SV.info });
     tabBar(list, state.tab);
     if (state.tab === "day") { const c = app.querySelector('.daypick [aria-current="true"]'); if (c) c.scrollIntoView({ inline: "center", block: "nearest" }); }
@@ -844,7 +851,7 @@ function viewCollect() {
   <div class="collect"><aside>
   <p class="hint" style="margin-top:10px">這裡是最詳細的地方：看到喜歡的先丟進來，之後再排進第幾天。「每日」只顯示精簡版，點景點的「景點功課」就會回到這裡的內容。</p>
   ${bigHTML(t).replace('<details class="card" open>', '<details class="card">')}
-  <section class="section"><header><h2>景點簡報</h2>${isOwner() ? `<button class="btn sm" data-act="addclip">＋ 丟進來</button>` : ""}</header>
+  <section class="section"><header><h2>景點簡報</h2></header>
     <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">${chip("all", "全部", all.length)}${chip("pool", "還沒排", all.filter(x => x.day < 0).length)}${CLIP_TAGS.map(g => chip(g, g)).join("")}</div>
   </section></aside><div class="cmain">
     ${L.length ? `<div class="cgrid">${L.map(({ it, day }) => { const dd = day >= 0 ? md(t.days[day].date) : null; return `<div class="card">
@@ -979,8 +986,7 @@ function viewFriends() {
   const F = [...state.friends].sort((a, b) => (b.metDate || "").localeCompare(a.metDate || ""));
   if (!F.length) return `<div class="card empty" style="margin-top:12px"><b>旅途中認識的朋友</b>記下在哪裡認識、聊了什麼、怎麼聯絡，下次去那個國家就知道可以找誰。<div style="margin-top:14px"><button class="btn primary" data-newfriend="">＋ 新增朋友</button></div></div>`;
   const byC = {}; F.forEach(f => { const t = state.trips.find(x => x.id === f.tripId); const code = f.country || (t && t.country) || "OTHER"; (byC[code] = byC[code] || []).push(f); });
-  return `<button class="btn primary wide" data-newfriend="" style="margin-top:8px">＋ 新增朋友</button>
-    <div class="stats" style="margin-top:12px"><div class="stat"><b>${F.length}</b><span>位朋友</span></div><div class="stat"><b>${Object.keys(byC).length}</b><span>個國家</span></div><div class="stat"><b>${new Set(F.map(f => f.tripId).filter(Boolean)).size}</b><span>趟旅行</span></div></div>
+  return `    <div class="stats" style="margin-top:12px"><div class="stat"><b>${F.length}</b><span>位朋友</span></div><div class="stat"><b>${Object.keys(byC).length}</b><span>個國家</span></div><div class="stat"><b>${new Set(F.map(f => f.tripId).filter(Boolean)).size}</b><span>趟旅行</span></div></div>
     ${P.regions.map(R => { const codes = Object.keys(byC).filter(c => worldOf(c).r === R.r); if (!codes.length) return "";
       return `<section class="section"><header><h2>${esc(R.r)}</h2></header>${codes.map(c => `<div class="eyebrow">${worldOf(c).f} ${esc(worldOf(c).n)}</div><div class="stack">${byC[c].map(friendCard).join("")}</div>`).join("")}</section>`; }).join("")}`;
 }
@@ -1438,6 +1444,14 @@ async function loadSample() {
 }
 
 /* ================= events ================= */
+$("#fab").addEventListener("click", () => {
+  const d = $("#fab").dataset.do;
+  if (d === "newtrip") return openNewTrip();
+  if (d === "friend") return openFriendEditor(null, {});
+  if (d === "clip") return openClipEditor();
+  if (d === "item") return openItemEditor(null);
+  if (d === "rec") return openCompose();
+});
 tabsEl.addEventListener("click", e => {
   const b = e.target.closest("[data-tab]"); if (!b) return; const k = b.dataset.tab;
   if (k.startsWith("home:")) return go("#/home/" + k.slice(5));

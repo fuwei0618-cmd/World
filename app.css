@@ -190,6 +190,8 @@ details[open].card summary:after{content:"－"}
 .tline .tripcard:before{content:"";position:absolute;left:-26px;top:50%;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--paper);transform:translateY(-50%)}
 
 /* tab bar */
+.fab{position:fixed;right:12px;bottom:calc(132px + env(safe-area-inset-bottom,0px));z-index:11;width:54px;height:54px;border-radius:50%;border:0;background:var(--rec);color:#fff;font-size:30px;line-height:1;box-shadow:0 4px 14px color-mix(in srgb,var(--rec) 45%,transparent);cursor:pointer}
+.fab[hidden]{display:none}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;max-width:560px;margin:0 auto}
 .tabs button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);padding:4px 0;font-weight:500}
 .tabs button svg{width:22px;height:22px}
