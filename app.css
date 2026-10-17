@@ -263,3 +263,15 @@ details[open].card summary:after{content:"－"}
 .bl.q{font-size:13.5px;color:var(--muted);font-weight:700}.bl.a{padding-left:16px;background:linear-gradient(var(--accent),var(--accent)) no-repeat 3px 6px/2px 1.1em}
 .vg .vrow{display:flex;gap:8px;margin-top:6px}.vg .vrow .bl.box{flex:1;width:auto}
 .wins2{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.wins2 .w{display:inline-flex;align-items:center;gap:5px;background:var(--soft);border-radius:99px;padding:2px 4px 2px 10px;font-size:13px}.wins2 small{color:var(--muted)}
+
+/* 2026-10-17：iPad 上框架放大（不要全部縮在中間一條）；蒐集區橫式 */
+.cgrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.cgrid>.card{margin:0}
+@media (min-width:820px){
+  .wrap{max-width:1080px;padding-inline:28px}
+  .tabs{max-width:1080px}
+  .sheet{max-width:720px}
+  .collect{display:grid;grid-template-columns:minmax(300px,360px) 1fr;gap:24px;align-items:start}
+  .collect>aside{position:sticky;top:12px;max-height:calc(100vh - 120px);overflow:auto}
+  .collect .cmain{padding-top:10px}
+}

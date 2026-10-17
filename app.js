@@ -382,8 +382,8 @@ function viewOverview() {
 
   ${isOwner() ? tripFriendsHTML(t) : ""}
 
-  ${t.team ? `<section class="section"><header><h2>相見歡</h2>${isOwner() ? `<button class="btn sm ghost" data-act="addmember">＋ 團員</button>` : ""}</header>
-    <div class="card"><div class="eyebrow">團員與分工（${t.team.members.length} 人）</div><div class="members">${t.team.members.map((m, i) => `<button class="member" ${isOwner() ? `data-member="${i}"` : "disabled"}><b>${esc(m.name)}</b><small>${esc(m.role)}</small><small>${esc(m.duty)}</small></button>`).join("")}</div></div>
+  ${t.team ? `<section class="section"><header><h2>相見歡</h2></header>
+    <p class="hint" style="margin:0">團員名單和分工在「資訊」。</p>
     ${t.team.note || t.team.oath.length ? `<details class="card"><summary>領隊真心話＆行前誓言</summary>${t.team.note ? `<p>${esc(t.team.note)}</p>` : ""}${t.team.oath.length ? `<ol style="margin:0;padding-left:20px">${t.team.oath.map(o => `<li>我發誓，${esc(o)}</li>`).join("")}</ol>` : ""}${isOwner() ? `<button class="btn sm" data-act="editteam" style="margin-top:10px">編輯</button>` : ""}</details>` : isOwner() ? `<button class="btn ghost" data-act="editteam">＋ 寫領隊真心話與行前誓言</button>` : ""}
   </section>` : isOwner() ? `<section class="section"><button class="btn ghost wide" data-act="addteam">＋ 這是團體旅行：加入團員分工</button></section>` : ""}`;
 }
@@ -493,8 +493,10 @@ function privateData() { return isOwner() ? state.trip.private : state.unlocked;
 function viewInfo() {
   const t = state.trip, pv = privateData();
   const edit = (k, i) => isOwner() ? `<button class="icon-btn" data-rec-edit="${k}:${i}" aria-label="編輯">${ICON.pen}</button>` : "";
-  return `${tripTop("機票・飯店・緊急")}
-  <section class="section" style="margin-top:8px"><header><h2>航班</h2>${isOwner() ? `<button class="btn sm ghost" data-rec-add="flights">＋ 航班</button>` : ""}</header>
+  return `${tripTop("成員・機票・飯店・緊急")}
+  ${t.team ? `<section class="section" style="margin-top:8px"><header><h2>成員</h2>${isOwner() ? `<button class="btn sm ghost" data-act="addmember">＋ 團員</button>` : ""}</header>
+    <div class="card"><div class="eyebrow">團員與分工（${t.team.members.length} 人）</div><div class="members">${t.team.members.map((m, i) => `<button class="member" ${isOwner() ? `data-member="${i}"` : "disabled"}><b>${esc(m.name)}</b><small>${esc(m.role)}</small><small>${esc(m.duty)}</small></button>`).join("")}</div></div></section>` : isOwner() ? `<section class="section" style="margin-top:8px"><button class="btn ghost wide" data-act="addteam">＋ 這是團體旅行：加入成員</button></section>` : ""}
+  <section class="section"><header><h2>航班</h2>${isOwner() ? `<button class="btn sm ghost" data-rec-add="flights">＋ 航班</button>` : ""}</header>
     ${t.flights.map((f, i) => `<div class="card"><div class="passhead"><span class="chip">${esc(f.dir)}${f.date ? "・" + esc(f.date) : ""}</span><div class="row"><b class="mono">${esc(f.no)}</b>${edit("flights", i)}</div></div>
       <div class="pass"><div><div class="tm">${esc(f.dep)}</div><div class="apt">${esc(f.from)}</div></div><div class="mid">✈</div><div><div class="tm">${esc(f.arr)}</div><div class="apt">${esc(f.to)}</div></div></div>
       ${f.note ? `<p class="hint" style="margin-top:8px;text-align:center">${esc(f.note)}</p>` : ""}</div>`).join("") || `<div class="card empty">還沒有航班</div>`}
@@ -826,7 +828,7 @@ function findItem(id) { for (const d of state.trip.days) { const it = d.items.fi
 /* ================= TRIP: 蒐集與規劃（最詳細的簡報區） =================
    每個景點只有一份：還沒排的放在 trip.pool，排好的在某一天；
    「每日」只顯示精簡版，點「景點功課」就回到這裡的詳細內容。 */
-const CLIP_TAGS = ["想吃", "想玩", "想住", "拍照點", "功課"];
+const CLIP_TAGS = ["想吃", "想玩", "想住", "夜生活", "拍照點", "功課"];
 function allSpots(t) {
   const out = (t.pool || []).map(it => ({ it, day: -1 }));
   t.days.forEach((d, i) => d.items.forEach(it => { if (!it.journalOnly && it.status !== "cancel") out.push({ it, day: i }); }));
@@ -839,11 +841,13 @@ function viewCollect() {
   const L = all.filter(x => f === "all" || (f === "pool" ? x.day < 0 : (x.it.tips || []).includes(f)));
   const chip = (k, l, n) => `<button class="chip" data-cf="${k}" aria-pressed="${f === k}" style="${f === k ? "background:var(--ink);color:var(--paper)" : ""}">${l}${n != null ? ` ${n}` : ""}</button>`;
   return `${tripTop(t.title)}
+  <div class="collect"><aside>
   <p class="hint" style="margin-top:10px">這裡是最詳細的地方：看到喜歡的先丟進來，之後再排進第幾天。「每日」只顯示精簡版，點景點的「景點功課」就會回到這裡的內容。</p>
   ${bigHTML(t).replace('<details class="card" open>', '<details class="card">')}
   <section class="section"><header><h2>景點簡報</h2>${isOwner() ? `<button class="btn sm" data-act="addclip">＋ 丟進來</button>` : ""}</header>
     <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">${chip("all", "全部", all.length)}${chip("pool", "還沒排", all.filter(x => x.day < 0).length)}${CLIP_TAGS.map(g => chip(g, g)).join("")}</div>
-    ${L.length ? `<div class="stack">${L.map(({ it, day }) => { const dd = day >= 0 ? md(t.days[day].date) : null; return `<div class="card">
+  </section></aside><div class="cmain">
+    ${L.length ? `<div class="cgrid">${L.map(({ it, day }) => { const dd = day >= 0 ? md(t.days[day].date) : null; return `<div class="card">
       <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><b style="font-size:16px">${esc(it.title)}</b><span class="chip" style="white-space:nowrap;${day < 0 ? "" : "background:var(--ink);color:var(--paper)"}">${day < 0 ? "還沒排" : `D${day}・${dd.m}/${dd.d}`}</span></div>
       ${it.desc ? `<p class="desc" style="white-space:pre-wrap">${esc(it.desc)}</p>` : ""}
       ${(it.place || (it.tips || []).length || it.link) ? `<div class="meta">${it.place ? `<a class="chip" href="${esc(mapURL(t, it))}" target="_blank" rel="noopener">${ICON.pin} ${esc(it.place)}</a>` : ""}${(it.tips || []).map(x => `<span class="chip">${esc(x)}</span>`).join("")}${it.link ? `<a class="chip" href="${esc(it.link)}" target="_blank" rel="noopener">▶ ${esc(it.linkTitle || "連結")}</a>` : ""}</div>` : ""}
@@ -851,13 +855,13 @@ function viewCollect() {
       ${isOwner() ? `<div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" data-move="${it.id}">${day < 0 ? "排進第幾天" : "換一天"}</button><button class="btn sm ghost" data-editclip="${it.id}">編輯</button></div>` : ""}
     </div>`; }).join("")}</div>`
     : `<div class="card empty"><b>${f === "all" ? "還沒有東西" : "這一類還沒有"}</b>${isOwner() ? "小紅書、IG、Google 地圖上看到喜歡的，按「＋ 丟進來」，貼連結、寫一句話就好。" : ""}</div>`}
-  </section>`;
+  </div></div>`;
 }
 function openClipEditor() {
   const t = state.trip; t.pool = t.pool || [];
   formSheet({ title: "丟進蒐集區", fields: [
       { k: "title", l: "名稱", ph: "例如：大足石刻、某家火鍋" },
-      { k: "tips", l: "標籤（一行一個：想吃、想玩、想住、拍照點、功課）", type: "lines", ph: "想玩\n拍照點" },
+      { k: "tips", l: "標籤（一行一個：想吃、想玩、想住、夜生活、拍照點、功課）", type: "lines", ph: "想玩\n拍照點" },
       { k: "link", l: "連結（小紅書、IG、YouTube…）", ph: "https://…" },
       { k: "place", l: "地點（選填）" },
       { k: "desc", l: "一句話筆記", type: "textarea" }],
